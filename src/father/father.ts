@@ -78,8 +78,10 @@ const admins = (process.env.ADMIN_USER_IDS ?? "")
   .filter(Boolean);
 
 export interface FatherOptions {
-  /** Preset tenant mode (e.g. @SwapFatherBot always mints swap bots). */
+  /** Preset tenant mode (an alias bot that only mints swap bots). */
   presetMode?: TenantMode;
+  /** Display name used in the factory's own copy (defaults per preset). */
+  title?: string;
 }
 
 export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {}) {
@@ -704,21 +706,22 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
   }
 
   function home(): FScreen {
+    const title = esc(opts.title ?? (opts.presetMode === "swap" ? "SwapFather" : "B4UFather"));
     const text =
       opts.presetMode === "swap"
         ? [
-            "🔄 <b>SwapFather</b> — mint your own swap bot",
+            `🔄 <b>${title}</b> — mint your own swap bot`,
             "",
             "Launch a crypto exchange bot under <b>your brand</b> in under a minute: any coin for any coin, 50+ currencies, fulfilled by uSwap's swap engine.",
             "",
             "You bring the audience; we run the engine. You earn on every swap.",
           ]
         : [
-            "🤖 <b>B4UFather</b> — mint your own crypto shop bot",
+            `🤖 <b>${title}</b> — mint your own crypto bot`,
             "",
-            "Launch a Telegram store under <b>your brand</b> in under a minute: gift cards, Telegram Stars & Premium, Discord Nitro, VPN time, prepaid cards — all paid in crypto, fulfilled by uSwap.",
+            "Launch a swap bot (any coin for any coin, 50+ currencies), a Telegram store (gift cards, Stars & Premium, Discord Nitro, VPN time, prepaid cards), or both — under <b>your brand</b>, live in under a minute, fulfilled by uSwap.",
             "",
-            "Sell everything, or run a niche bot (VPN-only, Discord-only, gift cards only). Or a swap bot — any coin for any coin. You bring the audience; we run the engine. You earn on every sale.",
+            "Go broad or niche: a VPN-only shop, a Discord-only store, a pure exchange. You bring the audience; we run the engine. You earn on every sale.",
           ];
     return {
       text: text.join("\n"),

@@ -55,7 +55,8 @@ for (const row of listTenants()) {
 
 // Father bot.
 const father = new Bot(fatherToken);
-registerFather(father, fleet);
+const fatherMe = await father.api.getMe();
+registerFather(father, fleet, { title: fatherMe.first_name });
 father.catch((err) => logger.error("father bot error", { err: String(err.error) }));
 
 // Optional brand alias: @SwapFatherBot — same wizard, preset to swap mode.
@@ -81,7 +82,6 @@ startPoller((tenantId) =>
 
 getFamilies().catch((err) => logger.warn("catalog warmup failed", { err: String(err) }));
 
-const fatherMe = await father.api.getMe();
 logger.info("fleet starting", {
   father: fatherMe.username,
   tenants: listTenants().filter((t) => t.status === "active").length,
