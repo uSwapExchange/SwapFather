@@ -149,10 +149,18 @@ async function showHome(u: Uctx, opts: { newMessage?: boolean } = {}): Promise<v
   );
 }
 
+/** True when the current screen IS the bot's root (niche bots loop to themselves). */
+function atNicheRoot(u: Uctx): boolean {
+  return isNiche(u.tenant) && !sellsSwaps(u.tenant) && u.s.nav.length <= 1;
+}
+
 async function showBrowse(u: Uctx): Promise<void> {
   const nav = flow.currentNav(u.s);
   if (!nav || !u.s.meta || !u.s.page) return showHome(u);
-  await showScreen(u, screens.renderBrowse(u.t, u.s.meta, nav, u.s.page));
+  await showScreen(
+    u,
+    screens.renderBrowse(u.t, u.s.meta, nav, u.s.page, { hideNav: atNicheRoot(u) }),
+  );
 }
 
 async function showCurrent(u: Uctx): Promise<void> {
@@ -161,9 +169,12 @@ async function showCurrent(u: Uctx): Promise<void> {
     case "browse":
       return showBrowse(u);
     case "swto":
+      // A swap-only bot's root is the receive picker — no back/home loop.
       return showScreen(
         u,
-        screens.renderSwapTo(u.t, s.swapChoices ?? [], s.swapMore ?? false),
+        screens.renderSwapTo(u.t, s.swapChoices ?? [], s.swapMore ?? false, {
+          hideNav: !sellsProducts(u.tenant),
+        }),
       );
     case "swtonet":
       return showScreen(u, screens.renderSwapToNetworks(u.t, s.swapNetChoice!));
@@ -180,7 +191,12 @@ async function showCurrent(u: Uctx): Promise<void> {
     case "amount":
       // Arm free-text input: presets are one tap, but typing "75" works too.
       s.awaiting = "amount";
-      return showScreen(u, screens.renderAmount(u.t, s.draft!));
+      return showScreen(
+        u,
+        screens.renderAmount(u.t, s.draft!, {
+          hideNav: atNicheRoot(u) && s.page?.length === 1,
+        }),
+      );
     case "dest":
       s.awaiting = "dest";
       return showScreen(u, screens.renderDest(u.t, s.draft!, u.ctx.from?.username));

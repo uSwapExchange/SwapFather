@@ -85,6 +85,7 @@ export function renderBrowse(
   meta: LevelMeta,
   nav: NavLevel,
   page: PageItem[],
+  opts: { hideNav?: boolean } = {},
 ): Screen {
   const lines: string[] = [];
   const title = nav.title ?? meta.title ?? "";
@@ -132,13 +133,17 @@ export function renderBrowse(
     if (nav.query) row.push(btn(t("btn.clearSearch"), "srx", "danger"));
     keyboard.push(row);
   }
-  keyboard.push(navRow(t));
+  if (!opts.hideNav) keyboard.push(navRow(t));
   return { text: lines.join("\n"), keyboard };
 }
 
 // ---------- amount ----------
 
-export function renderAmount(t: Translator, draft: Draft): Screen {
+export function renderAmount(
+  t: Translator,
+  draft: Draft,
+  opts: { hideNav?: boolean } = {},
+): Screen {
   const leaf = draft.leaf;
   const c = leaf.chain;
   const decimals = leafAmountDecimals(leaf);
@@ -178,8 +183,9 @@ export function renderAmount(t: Translator, draft: Draft): Screen {
   const keyboard: Keyboard = [
     ...grid(presetBtns, 3),
     ...(c.amount_options_raw?.length ? [] : [[btn(t("amount.custom"), "am:c")]]),
-    navRow(t),
   ];
+  // A single-product bot's root screen has nowhere to go "back" to.
+  if (!opts.hideNav) keyboard.push(navRow(t));
   return { text: lines.join("\n"), keyboard };
 }
 
@@ -216,6 +222,7 @@ export function renderSwapTo(
   t: Translator,
   choices: PayAssetChoice[],
   more: boolean,
+  opts: { hideNav?: boolean } = {},
 ): Screen {
   const lines = [t("swap.toTitle"), "", t("swap.toSubtitle")];
   let shown: PayAssetChoice[];
@@ -237,7 +244,7 @@ export function renderSwapTo(
   if (!more && choices.length > shown.length) {
     keyboard.push([btn(t("pay.morecoins"), "st:m")]);
   }
-  keyboard.push(navRow(t));
+  if (!opts.hideNav) keyboard.push(navRow(t));
   return { text: lines.join("\n"), keyboard };
 }
 
