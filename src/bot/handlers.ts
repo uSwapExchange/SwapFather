@@ -27,6 +27,7 @@ import {
   type Translator,
 } from "../i18n/index.ts";
 import { getFamilies } from "./catalog.ts";
+import { getGiftCardCountrySegment } from "./inline.ts";
 import * as flow from "./flow.ts";
 import type { FlowSession } from "./flow.ts";
 import { loadSession, persistSession, resetSession } from "./session.ts";
@@ -342,9 +343,9 @@ export function registerHandlers(bot: Bot) {
     const s = resetSession(ctx.from.id) as FlowSession;
     const u: Uctx = { ctx, s, t, userId: ctx.from.id, chatId: ctx.chat.id };
 
-    // Deep links: t.me/bot?start=gift-card etc.
+    // Deep links: t.me/bot?start=gift-card (family) or ?start=gc-amazon (brand).
     const payload = ctx.match?.trim();
-    if (payload) {
+    if (payload && payload !== "shop") {
       const families = await getFamilies();
       const family = families.find((f) => f.id === payload);
       if (family) {
@@ -354,9 +355,43 @@ export function registerHandlers(bot: Bot) {
           cursorStack: [null],
           nextCursor: null,
         });
-        await showBrowse(u);
+        if (autoSelectSingleLeaf(s)) await showCurrent(u);
+        else await showBrowse(u);
         persistSession(ctx.from.id, s);
         return;
+      }
+      if (payload.startsWith("gc-")) {
+        const brandId = payload.slice(3);
+        const country = await getGiftCardCountrySegment();
+        if (country && /^[A-Za-z0-9_-]+$/.test(brandId)) {
+          try {
+            await flow.enterLevel(s, {
+              asset: "gift-card",
+              segments: [
+                country,
+                {
+                  key: "brand",
+                  id: brandId,
+                  wire: {
+                    parent_group_id: country.wire?.parent_group_id ?? country.id,
+                    group_id: brandId,
+                  },
+                },
+              ],
+              cursorStack: [null],
+              nextCursor: null,
+            });
+            if (autoSelectSingleLeaf(s)) await showCurrent(u);
+            else await showBrowse(u);
+            persistSession(ctx.from.id, s);
+            return;
+          } catch (err) {
+            logger.warn("gc deep link failed; falling back to home", {
+              brandId,
+              err: String(err),
+            });
+          }
+        }
       }
     }
     await showHome(u, { newMessage: true });

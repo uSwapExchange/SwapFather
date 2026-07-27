@@ -24,7 +24,8 @@ Every screen is one anchored message edited in place — the chat never fills wi
 - **Order tracking** — background polling pushes payment-detected / converting / delivering / done straight into the deposit card; delivery codes are spoiler-wrapped and one-tap copyable.
 - **10 languages** out of the box (en, es, ru, zh, fr, de, pt, uk, fa, hi), auto-detected from Telegram, switchable with /language.
 - **Custom emoji + colored buttons** (Bot API 10.x) with automatic downgrade to plain unicode when the bot owner has no Telegram Premium.
-- **Deep links** — `t.me/YourBot?start=gift-card` opens the gift-card shelf directly.
+- **Deep links** — `t.me/YourBot?start=gift-card` opens the gift-card shelf; `?start=gc-amazon` jumps straight to a brand's amount screen.
+- **Inline mode** — type `@YourBot amazon` in any chat to share a product card with a buy-in-bot button (enable once via @BotFather `/setinline`; the bot degrades gracefully when it's off).
 
 ## Quick start
 
