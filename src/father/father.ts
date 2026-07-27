@@ -704,14 +704,24 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
   }
 
   function home(): FScreen {
+    const text =
+      opts.presetMode === "swap"
+        ? [
+            "🔄 <b>SwapFather</b> — mint your own swap bot",
+            "",
+            "Launch a crypto exchange bot under <b>your brand</b> in under a minute: any coin for any coin, 50+ currencies, fulfilled by uSwap's swap engine.",
+            "",
+            "You bring the audience; we run the engine. You earn on every swap.",
+          ]
+        : [
+            "🤖 <b>B4UFather</b> — mint your own crypto shop bot",
+            "",
+            "Launch a Telegram store under <b>your brand</b> in under a minute: gift cards, Telegram Stars & Premium, Discord Nitro, VPN time, prepaid cards — all paid in crypto, fulfilled by uSwap.",
+            "",
+            "Sell everything, or run a niche bot (VPN-only, Discord-only, gift cards only). Or a swap bot — any coin for any coin. You bring the audience; we run the engine. You earn on every sale.",
+          ];
     return {
-      text: [
-        "🤖 <b>B4UFather</b> — mint your own crypto shop bot",
-        "",
-        "Launch a Telegram store under <b>your brand</b> in under a minute: gift cards, Telegram Stars & Premium, Discord Nitro, VPN time, prepaid cards — all paid in crypto, fulfilled by uSwap.",
-        "",
-        "Sell everything, or run a niche bot (VPN-only, Discord-only, gift cards only). You bring the audience; we run the engine. You earn on every sale.",
-      ].join("\n"),
+      text: text.join("\n"),
       keyboard: [
         [btn("🤖 Create my bot", "c", "success")],
         [btn("📋 My bots", "m"), btn("❓ How it works", "w")],
@@ -720,12 +730,16 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
   }
 
   function howItWorks(): FScreen {
+    const step2 =
+      opts.presetMode === "swap"
+        ? "2️⃣ Pick a brand name — your bot swaps 50+ coins out of the box"
+        : "2️⃣ Pick a brand name and what to sell (products, swaps, or both)";
     return {
       text: [
         "<b>How it works</b>",
         "",
         "1️⃣ Make a bot in @BotFather and paste its token here",
-        "2️⃣ Pick a brand name and which categories to sell",
+        step2,
         "3️⃣ Your bot goes live instantly — hosted for you",
         "4️⃣ Set up payouts to earn a share of every sale (paid in NEAR/XMR)",
         "",
