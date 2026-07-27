@@ -9,7 +9,9 @@ COPY scripts ./scripts
 COPY tsconfig.json ./
 
 # SQLite state (tenants, orders, sessions) — mount a volume here.
-RUN mkdir -p /app/data
+# Run as root so a fresh named volume (root-owned on first mount) is writable.
+USER root
+RUN mkdir -p /app/data && chown -R root:root /app
 ENV DATABASE_PATH=/app/data/bestb4u.db
 
 # Fleet mode by default (father + flagship + tenants).

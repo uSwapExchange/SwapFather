@@ -167,8 +167,22 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           if (f.s.draft) f.s.draft.code = code;
           f.s.awaiting = "near";
           return show(f, {
-            text: "💰 <b>Payout account</b>\n\nSend the <b>NEAR account</b> that should receive your earnings (e.g. <code>yourname.near</code>). Required by uSwap's affiliate program.",
-            keyboard: [[btn("‹ Back", "pl")]],
+            text: [
+              "💰 <b>Payout account</b>",
+              "",
+              "Send the <b>NEAR account</b> that should receive your earnings (e.g. <code>yourname.near</code>).",
+              "",
+              "🆕 <b>Don't have one?</b> Takes ~2 minutes:",
+              "1. Go to near.com and tap <b>Create Account</b>",
+              "2. Sign up with email or a passphrase",
+              "3. Pick your account name — that name (like <code>yourname.near</code>) IS your payout address. Send it here.",
+              "",
+              "<i>You can also add a Monero address in the next step, and change either anytime.</i>",
+            ].join("\n"),
+            keyboard: [
+              [{ text: "🌈 Create a NEAR account", url: "https://near.com" }],
+              [btn("‹ Back", "pl")],
+            ],
           });
         }
         case "near": {
@@ -309,8 +323,22 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
             .slice(0, 32);
           f.s.awaiting = "near";
           return show(f, {
-            text: "💰 <b>Payout account</b>\n\nSend the <b>NEAR account</b> that should receive your earnings (e.g. <code>yourname.near</code>).",
-            keyboard: [[btn("‹ Back", "pl")]],
+            text: [
+              "💰 <b>Payout account</b>",
+              "",
+              "Send the <b>NEAR account</b> that should receive your earnings (e.g. <code>yourname.near</code>).",
+              "",
+              "🆕 <b>Don't have one?</b> Takes ~2 minutes:",
+              "1. Go to near.com and tap <b>Create Account</b>",
+              "2. Sign up with email or a passphrase",
+              "3. Pick your account name — that name (like <code>yourname.near</code>) IS your payout address. Send it here.",
+              "",
+              "<i>You can also add a Monero address in the next step, and change either anytime.</i>",
+            ].join("\n"),
+            keyboard: [
+              [{ text: "🌈 Create a NEAR account", url: "https://near.com" }],
+              [btn("‹ Back", "pl")],
+            ],
           });
         }
         case "xs":
@@ -565,7 +593,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       `Payouts: ${d.registered ? `✅ code <code>${esc(d.code ?? "")}</code>` : "not set up — you can add them later"}`,
     ];
     const keyboard: Keyboard = [[btn("🚀 Launch my bot", "L", "success")]];
-    if (!d.registered) keyboard.push([btn("💰 Set up payouts first", "ps")]);
+    if (!d.registered) keyboard.push([btn("💰 Set up payouts (optional)", "ps")]);
     keyboard.push([btn("‹ Cancel", "h", "danger")]);
     return show(f, { text: lines.join("\n"), keyboard });
   }
