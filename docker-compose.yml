@@ -14,7 +14,7 @@ services:
       - FATHER_ORG_ID=${FATHER_ORG_ID}
       - FLEET_TOKEN_KEY=${FLEET_TOKEN_KEY}
       - ADMIN_USER_IDS=${ADMIN_USER_IDS}
-      - SUPPORT_HANDLE=${SUPPORT_HANDLE:-@uSwapSupport}
+      - SUPPORT_HANDLE=${SUPPORT_HANDLE:-@maintenance}
       - DATABASE_PATH=/app/data/bestb4u.db
     volumes:
       - b4u_data:/app/data

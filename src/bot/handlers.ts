@@ -504,7 +504,7 @@ export function registerHandlers(bot: Bot, tenant: Tenant) {
     runUi(ctx, (u) =>
       showScreen(
         u,
-        screens.renderHelp(u.t, u.tenant.brandName, u.tenant.supportHandle ?? "@uSwapSupport"),
+        screens.renderHelp(u.t, u.tenant.brandName, u.tenant.supportHandle ?? "@maintenance"),
         { newMessage: true },
       ),
     ),
@@ -602,7 +602,7 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
         u.s.screen = "help";
         return showScreen(
           u,
-          screens.renderHelp(u.t, u.tenant.brandName, u.tenant.supportHandle ?? "@uSwapSupport"),
+          screens.renderHelp(u.t, u.tenant.brandName, u.tenant.supportHandle ?? "@maintenance"),
         );
       case "lg": {
         if (!arg) {

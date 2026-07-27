@@ -540,7 +540,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
   async function askSupport(f: Fctx) {
     f.s.awaiting = "support";
     return show(f, {
-      text: "💬 <b>Support contact</b>\n\nSend the @username your buyers should contact for help, or skip to use uSwap support.",
+      text: "💬 <b>Support contact</b>\n\nSend the @username your buyers should contact for help, or skip to use uSwap support (@maintenance).",
       keyboard: [[btn("⏭ Skip", "ss")]],
     });
   }
@@ -589,7 +589,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       `Brand: <b>${esc(d.brand ?? d.botName)}</b>`,
       `Type: ${modeLabel}`,
       ...(mode === "swap" ? [] : [`Catalog: ${esc(cats)}`]),
-      `Support: ${esc(d.support ?? "uSwap support")}`,
+      `Support: ${esc(d.support ?? "@maintenance")}`,
       `Payouts: ${d.registered ? `✅ code <code>${esc(d.code ?? "")}</code>` : "not set up — you can add them later"}`,
     ];
     const keyboard: Keyboard = [[btn("🚀 Launch my bot", "L", "success")]];
@@ -695,7 +695,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       `Status: ${row.status === "active" ? "🟢 live" : "⏸ paused"}`,
       `Type: ${mode === "shop" ? "🛍 Shop" : mode === "swap" ? "🔄 Swap" : "🛍 + 🔄 Both"}`,
       ...(mode === "swap" ? [] : [`Catalog: ${families ? esc(families.join(", ")) : "Everything"}`]),
-      `Support: ${esc(row.support_handle ?? "uSwap support")}`,
+      `Support: ${esc(row.support_handle ?? "@maintenance")}`,
       `Payouts: ${row.creator_code ? `✅ <code>${esc(row.creator_code)}</code>` : "not set up"}`,
       `Orders: ${orders.total} (${orders.completed} delivered)`,
     ];

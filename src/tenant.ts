@@ -40,7 +40,7 @@ export function sellsSwaps(tenant: Tenant): boolean {
 }
 
 export function defaultSupportHandle(): string {
-  return process.env.SUPPORT_HANDLE ?? "@uSwapSupport";
+  return process.env.SUPPORT_HANDLE ?? "@maintenance";
 }
 
 /** Tenant 0 — the flagship bot, configured from env (single-tenant mode). */
