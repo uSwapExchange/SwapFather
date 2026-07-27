@@ -25,28 +25,31 @@ let cachedFamilies: Family[] | null = null;
 let cachedAt = 0;
 const FAMILY_TTL_MS = 60 * 60 * 1000;
 
-export async function getFamilies(): Promise<Family[]> {
-  if (cachedFamilies && Date.now() - cachedAt < FAMILY_TTL_MS) return cachedFamilies;
-  const root = await uswap.level({ path: { asset: null, segments: [] }, side: "to" });
-  const drills = root.items.filter((i): i is LevelDrill => i.kind === "drill");
-  const families = drills
-    .filter(
-      (d) => d.node.category === "Special" || EXTRA_FAMILY_IDS.has(d.node.id),
-    )
-    .map((d) => ({
-      id: d.node.id,
-      name: d.node.name,
-      childCount: d.node.child_count,
-    }));
-  families.sort((a, b) => {
-    const ai = FAMILY_ORDER.indexOf(a.id);
-    const bi = FAMILY_ORDER.indexOf(b.id);
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-  });
-  cachedFamilies = families;
-  cachedAt = Date.now();
-  logger.info("catalog families refreshed", { count: families.length });
-  return families;
+export async function getFamilies(allowlist?: string[] | null): Promise<Family[]> {
+  if (!cachedFamilies || Date.now() - cachedAt >= FAMILY_TTL_MS) {
+    const root = await uswap.level({ path: { asset: null, segments: [] }, side: "to" });
+    const drills = root.items.filter((i): i is LevelDrill => i.kind === "drill");
+    const families = drills
+      .filter(
+        (d) => d.node.category === "Special" || EXTRA_FAMILY_IDS.has(d.node.id),
+      )
+      .map((d) => ({
+        id: d.node.id,
+        name: d.node.name,
+        childCount: d.node.child_count,
+      }));
+    families.sort((a, b) => {
+      const ai = FAMILY_ORDER.indexOf(a.id);
+      const bi = FAMILY_ORDER.indexOf(b.id);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+    cachedFamilies = families;
+    cachedAt = Date.now();
+    logger.info("catalog families refreshed", { count: families.length });
+  }
+  if (!allowlist) return cachedFamilies!;
+  const allowed = new Set(allowlist);
+  return cachedFamilies!.filter((f) => allowed.has(f.id));
 }
 
 /** Human product label for a leaf, e.g. "Adidas Gift Card", "Telegram Stars". */

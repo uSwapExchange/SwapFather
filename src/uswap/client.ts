@@ -114,6 +114,13 @@ export const uswap = {
     return request("POST", "/v1/quotes", { body: compact({ ...body }) });
   },
 
+  /** Public: resolve a creator code to a TTL-bound referral token. */
+  resolveReferral(
+    username: string,
+  ): Promise<{ token: string | null; expires_at: string | null }> {
+    return request("POST", "/v1/referrals/resolve", { body: { username } });
+  },
+
   /** Atomically create a bridge + commit the quoted plan as its first intent. */
   openBridge(body: BridgeOpenRequest, idempotencyKey: string): Promise<BridgeOpenResponse> {
     return request("POST", "/v1/bridges/open", {

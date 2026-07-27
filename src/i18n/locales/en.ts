@@ -11,7 +11,7 @@
 
 export const en = {
   // ---- home ----
-  "home.title": "<b>Best B4U</b> — buy digital stuff with crypto",
+  "home.title": "<b>{brand}</b> — buy digital stuff with crypto",
   "home.body":
     "Gift cards, Telegram Stars & Premium, Discord Nitro, VPN time and prepaid cards — paid with the coins you already hold.\n\n<i>No account. No card. Pick a product, send one payment, done.</i>",
   "home.choose": "What would you like to buy?",
@@ -130,10 +130,10 @@ export const en = {
   "lang.set": "✅ Language set to {language}.",
 
   // ---- help ----
-  "help.title": "<b>How Best B4U works</b>",
+  "help.title": "<b>How {brand} works</b>",
   "help.body":
     "1️⃣ Pick a product — gift card, Stars, Nitro, VPN, prepaid card\n2️⃣ Choose the amount and who it's for\n3️⃣ Pick a coin and send one payment to the address we give you\n4️⃣ Your product is delivered right here, usually in minutes\n\n💡 <b>Good to know</b>\n• No signup, no KYC — a payment is all it takes\n• Prices are locked when you confirm\n• Codes stay saved under 🧾 My orders\n• Powered by <a href=\"https://uswap.net\">uSwap</a>",
-  "help.support": "Questions? @uSwapSupport",
+  "help.support": "Questions? {support}",
 
   // ---- misc ----
   "error.generic": "⚠️ Something went wrong. Please try again.",

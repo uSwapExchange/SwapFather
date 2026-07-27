@@ -105,6 +105,16 @@ uSwap publishes three public custom-emoji packs (owned by @uSwap_Bot):
 
 Telegram lets a bot send custom emoji (message entities and button icons) when the **bot owner has Telegram Premium** or the bot owns a Fragment username. The bot renders them optimistically and permanently downgrades to curated unicode the first time Telegram rejects a send — so a self-hosted instance without Premium still looks intentional. Force plain unicode with `CUSTOM_EMOJI=0`.
 
+## B4UFather — whitelabel fleet
+
+The repo also ships a hosted multi-tenant mode: **@B4UFatherBot** lets anyone mint their own branded shop bot (whole catalog or a niche — Mullvad-only, Discord-only, gift cards only) in under a minute. Tenants earn a share of every sale through uSwap's affiliate program; they never touch funds or code.
+
+```bash
+bun run fleet   # hosts B4UFather + every tenant bot in one process
+```
+
+Design, tenancy model and environment: [docs/b4ufather.md](./docs/b4ufather.md).
+
 ## Adding a language
 
 1. Copy `src/i18n/locales/en.ts` to `<code>.ts`, translate the values (keep HTML tags, `{placeholders}` and emoji intact).

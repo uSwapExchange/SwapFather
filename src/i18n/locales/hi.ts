@@ -2,7 +2,7 @@ import type { Locale } from "../index.ts";
 
 export const hi: Partial<Locale> = {
   // ---- home ----
-  "home.title": "<b>Best B4U</b> — क्रिप्टो से डिजिटल चीज़ें खरीदें",
+  "home.title": "<b>{brand}</b> — क्रिप्टो से डिजिटल चीज़ें खरीदें",
   "home.body":
     "गिफ़्ट कार्ड, Telegram Stars और Premium, Discord Nitro, VPN टाइम और प्रीपेड कार्ड — उन्हीं कॉइन से जो आपके पास पहले से हैं।\n\n<i>न अकाउंट, न कार्ड। प्रोडक्ट चुनें, एक पेमेंट भेजें, हो गया।</i>",
   "home.choose": "क्या खरीदना चाहेंगे?",
@@ -117,10 +117,10 @@ export const hi: Partial<Locale> = {
   "lang.set": "✅ भाषा {language} सेट हो गई।",
 
   // ---- help ----
-  "help.title": "<b>Best B4U कैसे काम करता है</b>",
+  "help.title": "<b>{brand} कैसे काम करता है</b>",
   "help.body":
     "1️⃣ प्रोडक्ट चुनें — गिफ़्ट कार्ड, Stars, Nitro, VPN, प्रीपेड कार्ड\n2️⃣ रकम चुनें और बताएं किसके लिए है\n3️⃣ कोई कॉइन चुनें और हमारे दिए पते पर एक पेमेंट भेजें\n4️⃣ आपका प्रोडक्ट यहीं डिलीवर होगा, आमतौर पर कुछ ही मिनटों में\n\n💡 <b>जानने लायक बातें</b>\n• न साइनअप, न KYC — बस एक पेमेंट काफी है\n• कन्फर्म करते ही रेट लॉक हो जाता है\n• कोड 🧾 मेरे ऑर्डर में सेव रहते हैं\n• <a href=\"https://uswap.net\">uSwap</a> द्वारा संचालित",
-  "help.support": "कोई सवाल? @uSwapSupport",
+  "help.support": "कोई सवाल? {support}",
 
   // ---- misc ----
   "error.generic": "⚠️ कुछ गड़बड़ हो गई। फिर से कोशिश करें।",

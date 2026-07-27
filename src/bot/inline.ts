@@ -8,6 +8,7 @@
  */
 
 import type { Bot } from "grammy";
+import type { Tenant } from "../tenant.ts";
 import { uswap } from "../uswap/client.ts";
 import type { LevelDrill, LevelSegment } from "../uswap/types.ts";
 import { logger } from "../lib/logger.ts";
@@ -23,12 +24,15 @@ interface InlineProduct {
   /** /start deep-link payload (A-Za-z0-9_- only, ≤64 chars). */
   payload: string;
   emoji: string;
+  /** Catalog family this card belongs to (for tenant filtering). */
+  family: string;
 }
 
 /** Evergreen showcase shown for an empty query. */
 const SHOWCASE: InlineProduct[] = [
   {
     id: "gift-card",
+    family: "gift-card",
     title: "Gift Cards",
     description: "Amazon, Apple, Netflix, Xbox +30 more · up to 5% off · pay with crypto",
     thumb: `${IMG}/gift-card-placeholder.png`,
@@ -37,6 +41,7 @@ const SHOWCASE: InlineProduct[] = [
   },
   {
     id: "tg-stars",
+    family: "telegram",
     title: "Telegram Stars",
     description: "Top up any account · from 50 ⭐ · pay with crypto",
     thumb: `${IMG}/stars.png`,
@@ -45,6 +50,7 @@ const SHOWCASE: InlineProduct[] = [
   },
   {
     id: "tg-premium",
+    family: "telegram",
     title: "Telegram Premium",
     description: "3, 6 or 12 months · gift to anyone · pay with crypto",
     thumb: `${IMG}/Telegram_Premium.png`,
@@ -53,6 +59,7 @@ const SHOWCASE: InlineProduct[] = [
   },
   {
     id: "nitro",
+    family: "discord",
     title: "Discord Nitro",
     description: "Nitro gifts, server boosts & OG usernames · pay with crypto",
     thumb: `${IMG}/Nitro.png`,
@@ -61,6 +68,7 @@ const SHOWCASE: InlineProduct[] = [
   },
   {
     id: "prepaid",
+    family: "prepaid-card",
     title: "Prepaid Cards",
     description: "Visa & Mastercard, 160+ countries · $10–$5000 · pay with crypto",
     thumb: `${IMG}/debit_card.png`,
@@ -69,6 +77,7 @@ const SHOWCASE: InlineProduct[] = [
   },
   {
     id: "mullvad",
+    family: "mullvad",
     title: "Mullvad VPN",
     description: "1–24 months of VPN time · no account needed · pay with crypto",
     thumb: `${IMG}/mullvad.png`,
@@ -116,6 +125,7 @@ async function searchGiftCardBrands(query: string): Promise<InlineProduct[]> {
       return [
         {
           id: `gc-${brandId}`.slice(0, 64),
+          family: "gift-card",
           title: `${d.node.name} Gift Card`,
           description: `${leaf?.chain.subtitle ?? ""} · pay with crypto`.replace(/^ · /, ""),
           thumb: `${IMG}/gift-card-placeholder.png`,
@@ -128,20 +138,25 @@ async function searchGiftCardBrands(query: string): Promise<InlineProduct[]> {
 
 // ---- handler ----
 
-export function registerInline(bot: Bot, botUsername: string) {
+export function registerInline(bot: Bot, tenant: Tenant) {
+  const botUsername = tenant.botUsername;
+  const allowed = tenant.families ? new Set(tenant.families) : null;
+  const showcase = SHOWCASE.filter((p) => !allowed || allowed.has(p.family));
+  const giftCardsEnabled = !allowed || allowed.has("gift-card");
+
   bot.on("inline_query", async (ctx) => {
     const query = ctx.inlineQuery.query.trim();
     let products: InlineProduct[];
     try {
       if (!query) {
-        products = SHOWCASE;
+        products = showcase;
       } else {
         const q = query.toLowerCase();
-        const staticHits = SHOWCASE.filter(
+        const staticHits = showcase.filter(
           (p) =>
             p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q),
         );
-        const brands = await searchGiftCardBrands(query);
+        const brands = giftCardsEnabled ? await searchGiftCardBrands(query) : [];
         products = [...brands, ...staticHits].slice(0, 20);
       }
 

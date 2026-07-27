@@ -2,7 +2,7 @@ import type { Locale } from "../index.ts";
 
 export const pt: Partial<Locale> = {
   // ---- home ----
-  "home.title": "<b>Best B4U</b> — compre produtos digitais com cripto",
+  "home.title": "<b>{brand}</b> — compre produtos digitais com cripto",
   "home.body":
     "Cartões-presente, Telegram Stars e Premium, Discord Nitro, tempo de VPN e cartões pré-pagos — pagos com as moedas que você já tem.\n\n<i>Sem conta. Sem cartão. Escolha um produto, envie um pagamento e pronto.</i>",
   "home.choose": "O que você quer comprar?",
@@ -117,10 +117,10 @@ export const pt: Partial<Locale> = {
   "lang.set": "✅ Idioma definido para {language}.",
 
   // ---- help ----
-  "help.title": "<b>Como o Best B4U funciona</b>",
+  "help.title": "<b>Como o {brand} funciona</b>",
   "help.body":
     "1️⃣ Escolha um produto — cartão-presente, Stars, Nitro, VPN, cartão pré-pago\n2️⃣ Escolha o valor e para quem é\n3️⃣ Escolha uma moeda e envie um único pagamento para o endereço que fornecemos\n4️⃣ Seu produto é entregue aqui mesmo, geralmente em minutos\n\n💡 <b>Bom saber</b>\n• Sem cadastro, sem KYC — basta um pagamento\n• Os preços travam quando você confirma\n• Os códigos ficam salvos em 🧾 Meus pedidos\n• Tecnologia <a href=\"https://uswap.net\">uSwap</a>",
-  "help.support": "Dúvidas? @uSwapSupport",
+  "help.support": "Dúvidas? {support}",
 
   // ---- misc ----
   "error.generic": "⚠️ Algo deu errado. Tente de novo.",

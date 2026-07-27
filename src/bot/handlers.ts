@@ -39,17 +39,20 @@ import { uswap, UswapApiError } from "../uswap/client.ts";
 import { esc, rawToHuman } from "../lib/format.ts";
 import { logger } from "../lib/logger.ts";
 import { checkOrderNow } from "./poller.ts";
+import { isNiche, type Tenant } from "../tenant.ts";
 
 interface Uctx {
   ctx: Context;
   s: FlowSession;
   t: Translator;
+  tenant: Tenant;
   userId: number;
   chatId: number;
 }
 
-function getT(ctx: Context): { t: Translator; lang: string } {
+function getT(tenant: Tenant, ctx: Context): { t: Translator; lang: string } {
   const user = upsertUser({
+    tenantId: tenant.id,
     userId: ctx.from!.id,
     tgLanguageCode: ctx.from?.language_code,
     username: ctx.from?.username,
@@ -60,6 +63,12 @@ function getT(ctx: Context): { t: Translator; lang: string } {
 
 async function showScreen(u: Uctx, screen: Screen, opts: { newMessage?: boolean } = {}) {
   let { text, keyboard } = screen;
+  // Bots whose owner lacks Premium had custom emoji rejected before —
+  // strip up front instead of burning a failed API call every render.
+  if (!customEmojiEnabled(u.tenant.botId)) {
+    text = stripTgEmoji(text);
+    keyboard = stripIcons(keyboard);
+  }
   for (let attempt = 0; attempt < 2; attempt++) {
     const payload = {
       parse_mode: "HTML" as const,
@@ -87,9 +96,15 @@ async function showScreen(u: Uctx, screen: Screen, opts: { newMessage?: boolean 
       // Self-hosters without Telegram Premium on the bot owner: Telegram may
       // reject custom emoji entities / button icons. Degrade to unicode for
       // the rest of the process lifetime and retry once.
-      if (attempt === 0 && customEmojiEnabled() && isCustomEmojiRejection(String(err))) {
-        logger.warn("custom emoji rejected by Telegram; falling back to unicode");
-        disableCustomEmoji();
+      if (
+        attempt === 0 &&
+        customEmojiEnabled(u.tenant.botId) &&
+        isCustomEmojiRejection(String(err))
+      ) {
+        logger.warn("custom emoji rejected by Telegram; falling back to unicode", {
+          botId: u.tenant.botId,
+        });
+        disableCustomEmoji(u.tenant.botId);
         text = stripTgEmoji(text);
         keyboard = stripIcons(keyboard);
         continue;
@@ -103,22 +118,34 @@ function isCustomEmojiRejection(msg: string): boolean {
   return /custom.?emoji|emoji.?id|button.*icon|icon.*button/i.test(msg);
 }
 
-async function showHome(u: Uctx, opts: { newMessage?: boolean } = {}) {
-  const families = await getFamilies();
+async function showHome(u: Uctx, opts: { newMessage?: boolean } = {}): Promise<void> {
+  const families = await getFamilies(u.tenant.families);
   u.s.nav = [];
   u.s.draft = undefined;
   u.s.awaiting = null;
+  // Niche mode: a single-category bot IS that category — home opens the
+  // category itself, no pointless one-button shop grid in between.
+  if (isNiche(u.tenant) && families.length === 1) {
+    await flow.enterLevel(u.s, {
+      asset: families[0]!.id,
+      segments: [],
+      cursorStack: [null],
+      nextCursor: null,
+    });
+    if (autoSelectSingleLeaf(u.s)) return showCurrent(u);
+    return showBrowse(u);
+  }
   u.s.screen = "home";
-  await showScreen(u, screens.renderHome(u.t, families), opts);
+  await showScreen(u, screens.renderHome(u.t, families, u.tenant.brandName), opts);
 }
 
-async function showBrowse(u: Uctx) {
+async function showBrowse(u: Uctx): Promise<void> {
   const nav = flow.currentNav(u.s);
   if (!nav || !u.s.meta || !u.s.page) return showHome(u);
   await showScreen(u, screens.renderBrowse(u.t, u.s.meta, nav, u.s.page));
 }
 
-async function showCurrent(u: Uctx) {
+async function showCurrent(u: Uctx): Promise<void> {
   const s = u.s;
   switch (s.screen) {
     case "browse":
@@ -146,7 +173,7 @@ async function showQuote(u: Uctx) {
   const s = u.s;
   await showScreen(u, screens.renderQuoteLoading(u.t));
   try {
-    await flow.fetchQuote(s);
+    await flow.fetchQuote(s, u.tenant);
   } catch (err) {
     return showQuoteError(u, err);
   }
@@ -173,7 +200,7 @@ async function showQuoteError(u: Uctx, err: unknown) {
     if (err.code === "invalid_destination") {
       u.s.screen = "dest";
       u.s.awaiting = "dest";
-      persistSession(u.userId, u.s);
+      persistSession(u.tenant.id, u.userId, u.s);
       const scr = screens.renderDest(u.t, u.s.draft!, u.ctx.from?.username);
       scr.text = `⚠️ ${esc(reason)}\n\n${scr.text}`;
       return showScreen(u, scr);
@@ -197,7 +224,7 @@ async function confirmAndOpen(u: Uctx) {
   let result: flow.CommitResult;
   await showScreen(u, screens.renderQuoteLoading(u.t));
   try {
-    result = await flow.commit(s, externalId);
+    result = await flow.commit(s, u.tenant, externalId);
   } catch (err) {
     if (err instanceof flow.RepriceRequiredError) {
       // The approved price expired and the market moved — show the fresh
@@ -213,6 +240,7 @@ async function confirmAndOpen(u: Uctx) {
   const productLabel = screens.formatProductAmount(draft);
 
   const orderId = insertOrder({
+    tenantId: u.tenant.id,
     userId: u.userId,
     chatId: u.chatId,
     bridgeId: result.bridgeId,
@@ -269,14 +297,16 @@ async function confirmAndOpen(u: Uctx) {
 // ---------- orders ----------
 
 async function showOrders(u: Uctx, opts: { newMessage?: boolean } = {}) {
-  const orders = listUserOrders(u.userId, 10);
+  const orders = listUserOrders(u.tenant.id, u.userId, 10);
   u.s.screen = "orders";
   await showScreen(u, screens.renderOrders(u.t, orders), opts);
 }
 
 async function showOrderDetail(u: Uctx, orderId: number) {
   const order = getOrder(orderId);
-  if (!order || order.user_id !== u.userId) return showOrders(u);
+  if (!order || order.user_id !== u.userId || order.tenant_id !== u.tenant.id) {
+    return showOrders(u);
+  }
   let vault = null;
   if (order.status === "completed") {
     try {
@@ -336,17 +366,21 @@ async function goBack(u: Uctx) {
 
 // ---------- registration ----------
 
-export function registerHandlers(bot: Bot) {
+export function registerHandlers(bot: Bot, tenant: Tenant) {
+  const runUi = makeRunUi(tenant);
+  const handleCallback = makeHandleCallback(tenant, runUi);
+  const handleText = makeHandleText(runUi);
+
   bot.command("start", async (ctx) => {
     if (!ctx.from || ctx.chat.type !== "private") return;
-    const { t } = getT(ctx);
-    const s = resetSession(ctx.from.id) as FlowSession;
-    const u: Uctx = { ctx, s, t, userId: ctx.from.id, chatId: ctx.chat.id };
+    const { t } = getT(tenant, ctx);
+    const s = resetSession(tenant.id, ctx.from.id) as FlowSession;
+    const u: Uctx = { ctx, s, t, tenant, userId: ctx.from.id, chatId: ctx.chat.id };
 
     // Deep links: t.me/bot?start=gift-card (family) or ?start=gc-amazon (brand).
     const payload = ctx.match?.trim();
     if (payload && payload !== "shop") {
-      const families = await getFamilies();
+      const families = await getFamilies(tenant.families);
       const family = families.find((f) => f.id === payload);
       if (family) {
         await flow.enterLevel(s, {
@@ -357,10 +391,10 @@ export function registerHandlers(bot: Bot) {
         });
         if (autoSelectSingleLeaf(s)) await showCurrent(u);
         else await showBrowse(u);
-        persistSession(ctx.from.id, s);
+        persistSession(tenant.id, ctx.from.id, s);
         return;
       }
-      if (payload.startsWith("gc-")) {
+      if (payload.startsWith("gc-") && (!tenant.families || tenant.families.includes("gift-card"))) {
         const brandId = payload.slice(3);
         const country = await getGiftCardCountrySegment();
         if (country && /^[A-Za-z0-9_-]+$/.test(brandId)) {
@@ -383,7 +417,7 @@ export function registerHandlers(bot: Bot) {
             });
             if (autoSelectSingleLeaf(s)) await showCurrent(u);
             else await showBrowse(u);
-            persistSession(ctx.from.id, s);
+            persistSession(tenant.id, ctx.from.id, s);
             return;
           } catch (err) {
             logger.warn("gc deep link failed; falling back to home", {
@@ -395,17 +429,23 @@ export function registerHandlers(bot: Bot) {
       }
     }
     await showHome(u, { newMessage: true });
-    persistSession(ctx.from.id, s);
+    persistSession(tenant.id, ctx.from.id, s);
   });
 
   bot.command("shop", (ctx) => runUi(ctx, (u) => showHome(u, { newMessage: true })));
   bot.command("orders", (ctx) => runUi(ctx, (u) => showOrders(u, { newMessage: true })));
   bot.command("help", (ctx) =>
-    runUi(ctx, (u) => showScreen(u, screens.renderHelp(u.t), { newMessage: true })),
+    runUi(ctx, (u) =>
+      showScreen(
+        u,
+        screens.renderHelp(u.t, u.tenant.brandName, u.tenant.supportHandle ?? "@uSwapSupport"),
+        { newMessage: true },
+      ),
+    ),
   );
   bot.command("language", (ctx) =>
     runUi(ctx, async (u) => {
-      const user = upsertUser({ userId: u.userId });
+      const user = upsertUser({ tenantId: u.tenant.id, userId: u.userId });
       const active = user.language ?? resolveLanguage(user.tg_language_code ?? undefined);
       u.s.screen = "lang";
       await showScreen(u, screens.renderLanguage(u.t, SUPPORTED_LANGUAGES, active), {
@@ -422,7 +462,7 @@ export function registerHandlers(bot: Bot) {
     } catch (err) {
       logger.error("callback failed", { data, err: String(err) });
       await ctx
-        .answerCallbackQuery({ text: getT(ctx).t("error.generic"), show_alert: false })
+        .answerCallbackQuery({ text: getT(tenant, ctx).t("error.generic"), show_alert: false })
         .catch(() => {});
     }
   });
@@ -450,20 +490,25 @@ function autoSelectSingleLeaf(s: FlowSession): boolean {
   return false;
 }
 
-async function runUi(ctx: Context, fn: (u: Uctx) => Promise<void>) {
-  if (!ctx.from || !ctx.chat) return;
-  const { t } = getT(ctx);
-  const s = loadSession(ctx.from.id) as FlowSession;
-  const u: Uctx = { ctx, s, t, userId: ctx.from.id, chatId: ctx.chat.id };
-  try {
-    await fn(u);
-  } finally {
-    persistSession(u.userId, u.s);
-  }
+type RunUi = (ctx: Context, fn: (u: Uctx) => Promise<void>) => Promise<void>;
+
+function makeRunUi(tenant: Tenant): RunUi {
+  return async (ctx, fn) => {
+    if (!ctx.from || !ctx.chat) return;
+    const { t } = getT(tenant, ctx);
+    const s = loadSession(tenant.id, ctx.from.id) as FlowSession;
+    const u: Uctx = { ctx, s, t, tenant, userId: ctx.from.id, chatId: ctx.chat.id };
+    try {
+      await fn(u);
+    } finally {
+      persistSession(tenant.id, u.userId, u.s);
+    }
+  };
 }
 
-async function handleCallback(ctx: Context, data: string) {
-  await runUi(ctx, async (u) => {
+function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
+  return async (ctx: Context, data: string) =>
+    runUi(ctx, async (u) => {
     const s = u.s;
     // Callbacks from an outdated anchor: refuse gently (except order views,
     // which are safe from any message).
@@ -489,15 +534,18 @@ async function handleCallback(ctx: Context, data: string) {
         return showHome(u);
       case "hp":
         u.s.screen = "help";
-        return showScreen(u, screens.renderHelp(u.t));
+        return showScreen(
+          u,
+          screens.renderHelp(u.t, u.tenant.brandName, u.tenant.supportHandle ?? "@uSwapSupport"),
+        );
       case "lg": {
         if (!arg) {
-          const user = upsertUser({ userId: u.userId });
+          const user = upsertUser({ tenantId: u.tenant.id, userId: u.userId });
           const active = user.language ?? resolveLanguage(user.tg_language_code ?? undefined);
           s.screen = "lang";
           return showScreen(u, screens.renderLanguage(u.t, SUPPORTED_LANGUAGES, active));
         }
-        setUserLanguage(u.userId, arg);
+        setUserLanguage(u.tenant.id, u.userId, arg);
         const t2 = getTranslator(arg);
         u.t = t2;
         const langLabel = SUPPORTED_LANGUAGES.find((l) => l.code === arg)?.label ?? arg;
@@ -651,7 +699,7 @@ async function handleCallback(ctx: Context, data: string) {
       case "ost": {
         const orderId = Number(arg);
         const order = getOrder(orderId);
-        if (order && order.user_id === u.userId) {
+        if (order && order.user_id === u.userId && order.tenant_id === u.tenant.id) {
           await checkOrderNow(ctx.api, order);
           if (!TERMINAL_ORDER_STATUSES.has(order.status)) {
             await ctx
@@ -668,7 +716,7 @@ async function handleCallback(ctx: Context, data: string) {
       case "da": {
         const [orderIdStr = "", itemId = "", ...actionParts] = arg.split(":");
         const order = getOrder(Number(orderIdStr));
-        if (!order || order.user_id !== u.userId) return;
+        if (!order || order.user_id !== u.userId || order.tenant_id !== u.tenant.id) return;
         try {
           await uswap.runDeliveryAction(
             order.bridge_id,
@@ -696,8 +744,9 @@ async function handleCallback(ctx: Context, data: string) {
   });
 }
 
-async function handleText(ctx: Context) {
-  await runUi(ctx, async (u) => {
+function makeHandleText(runUi: RunUi) {
+  return async (ctx: Context) =>
+    runUi(ctx, async (u) => {
     const s = u.s;
     const text = ctx.message?.text ?? "";
     switch (s.awaiting) {

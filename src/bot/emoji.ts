@@ -16,20 +16,28 @@ import uswapEmojiIds from "./uswap-emoji-ids.json" with { type: "json" };
 
 const ids = uswapEmojiIds as Record<string, string>;
 
-let enabled = process.env.CUSTOM_EMOJI !== "0";
+const globallyEnabled = process.env.CUSTOM_EMOJI !== "0";
 
-export function customEmojiEnabled(): boolean {
-  return enabled;
+/**
+ * Custom-emoji entitlement is per BOT (the rule is "bot owner has Premium",
+ * and in fleet mode every tenant bot has a different owner). Rendering always
+ * produces the rich version; the send layer strips it for bots Telegram has
+ * rejected once.
+ */
+const disabledBots = new Set<number>();
+
+export function customEmojiEnabled(botId: number): boolean {
+  return globallyEnabled && !disabledBots.has(botId);
 }
 
-/** Called by the render layer when Telegram rejects custom emoji. */
-export function disableCustomEmoji(): void {
-  enabled = false;
+/** Called by the send layer when Telegram rejects custom emoji for a bot. */
+export function disableCustomEmoji(botId: number): void {
+  disabledBots.add(botId);
 }
 
 /** uSwap pack emoji id for a key like "asset-btc", "prod-nitro", "net-base". */
 export function packEmojiId(key: string): string | undefined {
-  return enabled ? ids[key] : undefined;
+  return globallyEnabled ? ids[key] : undefined;
 }
 
 /** Inline emoji for HTML message text: uSwap custom emoji + unicode fallback. */

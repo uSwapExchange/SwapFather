@@ -14,7 +14,8 @@ function required(name: string): string {
 }
 
 export const config = {
-  telegramBotToken: required("TELEGRAM_BOT_TOKEN"),
+  /** Flagship bot token. Required in single-tenant mode; optional for the fleet. */
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
   uswapApiKey: required("USWAP_API_KEY"),
   uswapApiBase: process.env.USWAP_API_BASE ?? "https://partner-api.uswap.net",
   databasePath: process.env.DATABASE_PATH ?? "./data/bestb4u.db",

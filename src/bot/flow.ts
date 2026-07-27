@@ -22,8 +22,38 @@ import {
   productLabel,
 } from "./catalog.ts";
 import type { NavLevel, PageItem, PayAssetChoice, Session } from "./session.ts";
+import type { Tenant } from "../tenant.ts";
 import { humanToRaw, rawToHuman } from "../lib/format.ts";
 import { logger } from "../lib/logger.ts";
+
+// ---------- referral attribution ----------
+
+const referralCache = new Map<string, { token: string; expiresAtMs: number }>();
+
+/**
+ * Resolve the tenant's creator code to a referral token (cached until just
+ * before expiry). Attribution must never block a sale — failures return
+ * undefined and the quote proceeds unattributed.
+ */
+async function referralTokenFor(tenant: Tenant): Promise<string | undefined> {
+  const code = tenant.creatorCode;
+  if (!code) return undefined;
+  const cached = referralCache.get(code);
+  if (cached && Date.now() < cached.expiresAtMs - 60_000) return cached.token;
+  try {
+    const res = await uswap.resolveReferral(code);
+    if (res.token && res.expires_at) {
+      referralCache.set(code, {
+        token: res.token,
+        expiresAtMs: new Date(res.expires_at).getTime(),
+      });
+      return res.token;
+    }
+  } catch (err) {
+    logger.warn("referral resolve failed", { code, err: String(err) });
+  }
+  return undefined;
+}
 
 export type ScreenId =
   | "home"
@@ -375,12 +405,14 @@ export function selectPayNetwork(
 
 // ---------- quote & commit ----------
 
-export async function fetchQuote(s: FlowSession): Promise<QuoteResponse> {
+export async function fetchQuote(s: FlowSession, tenant: Tenant): Promise<QuoteResponse> {
   const draft = s.draft!;
+  const referralToken = await referralTokenFor(tenant);
   const q = await uswap.quote({
     source_asset_v1: draft.payAssetV1!,
     destination_asset_v1: draft.leaf.asset_v1,
     ...(draft.destination ? { destination_address: draft.destination } : {}),
+    ...(referralToken ? { referral_token: referralToken } : {}),
     amount: draft.amountHuman!,
     input_side: "to",
     input_type: "human",
@@ -429,9 +461,11 @@ export class RepriceRequiredError extends Error {
  */
 export async function commit(
   s: FlowSession,
+  tenant: Tenant,
   externalId: string,
 ): Promise<CommitResult> {
   const draft = s.draft!;
+  const referralToken = await referralTokenFor(tenant);
   // The ceiling binds to the price the user APPROVED — never to a re-quote.
   const approvedCeilingRaw = (
     (BigInt(draft.quote!.source_amount_raw) * 102n) / 100n
@@ -446,6 +480,7 @@ export async function commit(
           source_asset_v1: draft.payAssetV1!,
           destination_asset_v1: draft.leaf.asset_v1,
           ...(draft.destination ? { destination_address: draft.destination } : {}),
+          ...(referralToken ? { referral_token: referralToken } : {}),
           amount: draft.amountHuman!,
           input_side: "to",
           input_type: "human",
@@ -469,7 +504,7 @@ export async function commit(
         ["quote_not_found", "quote_expired", "stale_plan"].includes(err.code);
       if (retryable && attempt === 1) {
         logger.info("quote expired at commit; re-quoting", { externalId });
-        await fetchQuote(s);
+        await fetchQuote(s, tenant);
         if (BigInt(draft.quote!.source_amount_raw) > BigInt(approvedCeilingRaw)) {
           throw new RepriceRequiredError();
         }

@@ -90,15 +90,15 @@ export interface Session {
   payNetChoice?: PayAssetChoice;
 }
 
-export function loadSession(userId: number): Session {
-  return getSession<Session>(userId) ?? { nav: [] };
+export function loadSession(tenantId: number, userId: number): Session {
+  return getSession<Session>(tenantId, userId) ?? { nav: [] };
 }
 
-export function persistSession(userId: number, s: Session) {
-  saveSession(userId, s);
+export function persistSession(tenantId: number, userId: number, s: Session) {
+  saveSession(tenantId, userId, s);
 }
 
-export function resetSession(userId: number): Session {
-  clearSession(userId);
+export function resetSession(tenantId: number, userId: number): Session {
+  clearSession(tenantId, userId);
   return { nav: [] };
 }

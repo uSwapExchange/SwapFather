@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "bun run --watch src/main.ts",
     "start": "bun run src/main.ts",
+    "fleet": "bun run src/fleet.ts",
     "typecheck": "tsc --noEmit",
     "setup:telegram": "bun run scripts/setup-telegram.ts",
     "test": "bun test"

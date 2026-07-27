@@ -47,8 +47,14 @@ function navRow(t: Translator, opts: { back?: boolean; home?: boolean } = {}): B
 
 // ---------- home ----------
 
-export function renderHome(t: Translator, families: Family[]): Screen {
-  const text = [t("home.title"), "", t("home.body"), "", `<b>${t("home.choose")}</b>`].join("\n");
+export function renderHome(t: Translator, families: Family[], brand: string): Screen {
+  const text = [
+    t("home.title", { brand: esc(brand) }),
+    "",
+    t("home.body"),
+    "",
+    `<b>${t("home.choose")}</b>`,
+  ].join("\n");
   const familyBtns = families.map((f) => {
     const icon = productIconId(f.id);
     // With a brand icon the unicode glyph would double up — icon carries it.
@@ -469,9 +475,15 @@ export function renderLanguage(
   };
 }
 
-export function renderHelp(t: Translator): Screen {
+export function renderHelp(t: Translator, brand: string, support: string): Screen {
   return {
-    text: [t("help.title"), "", t("help.body"), "", t("help.support")].join("\n"),
+    text: [
+      t("help.title", { brand: esc(brand) }),
+      "",
+      t("help.body"),
+      "",
+      t("help.support", { support: esc(support) }),
+    ].join("\n"),
     keyboard: [[btn(t("btn.home"), "h")]],
   };
 }

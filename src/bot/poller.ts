@@ -13,12 +13,12 @@
 import type { Api } from "grammy";
 import {
   getOrder,
+  getUserLangRow,
   listActiveOrders,
   markOrderDeliveredNotified,
   setOrderQrMessage,
+  updateOrderIntent,
   updateOrderStatus,
-  TERMINAL_ORDER_STATUSES,
-  db,
   type OrderRow,
 } from "../lib/store.ts";
 import { getTranslator, resolveLanguage } from "../i18n/index.ts";
@@ -34,27 +34,28 @@ const POLL_INTERVAL_MS = 8_000;
 const EFFECT_CONFETTI = "5046509860389126442";
 
 function translatorForOrder(order: OrderRow) {
-  const row = db
-    .query<{ language: string | null; tg_language_code: string | null }, [number]>(
-      "SELECT language, tg_language_code FROM users WHERE user_id = ?1",
-    )
-    .get(order.user_id);
+  const row = getUserLangRow(order.tenant_id, order.user_id);
   const lang = row?.language ?? resolveLanguage(row?.tg_language_code ?? undefined);
   return getTranslator(lang);
 }
 
-export function startPoller(api: Api) {
+/** Resolves the Api handle for a tenant — undefined when the bot is paused. */
+export type ApiResolver = (tenantId: number) => Api | undefined;
+
+export function startPoller(getApi: ApiResolver) {
   setInterval(() => {
-    void pollOnce(api).catch((err) =>
+    void pollOnce(getApi).catch((err) =>
       logger.error("poll cycle failed", { err: String(err) }),
     );
   }, POLL_INTERVAL_MS);
   logger.info("order poller started", { intervalMs: POLL_INTERVAL_MS });
 }
 
-async function pollOnce(api: Api) {
+async function pollOnce(getApi: ApiResolver) {
   const active = listActiveOrders();
   for (const order of active) {
+    const api = getApi(order.tenant_id);
+    if (!api) continue; // tenant paused/removed — resume when it's back
     try {
       await checkOrderNow(api, order);
     } catch (err) {
@@ -64,15 +65,12 @@ async function pollOnce(api: Api) {
 }
 
 /** Poll a single order immediately (also used by the Refresh button). */
-export async function checkOrderNow(api: Api, order: OrderRow) {
+export async function checkOrderNow(api: Api, order: OrderRow): Promise<void> {
   const { intent } = await uswap.getIntent(order.intent_id);
 
   // Late deposits replace expired intents with a market intent — follow it.
   if (intent.status === "expired" && intent.replaced_by_intent_id) {
-    db.query("UPDATE orders SET intent_id = ?2 WHERE id = ?1").run(
-      order.id,
-      intent.replaced_by_intent_id,
-    );
+    updateOrderIntent(order.id, intent.replaced_by_intent_id);
     order.intent_id = intent.replaced_by_intent_id;
     return checkOrderNow(api, order);
   }

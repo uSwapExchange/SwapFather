@@ -2,7 +2,7 @@ import type { Locale } from "../index.ts";
 
 export const fa: Partial<Locale> = {
   // ---- home ----
-  "home.title": "<b>Best B4U</b> — خرید کالای دیجیتال با کریپتو",
+  "home.title": "<b>{brand}</b> — خرید کالای دیجیتال با کریپتو",
   "home.body":
     "گیفت کارت، Telegram Stars و Premium، Discord Nitro، اشتراک VPN و کارت‌های پیش‌پرداخت — با همان کوینی که همین الان داری.\n\n<i>بدون حساب، بدون کارت بانکی. محصول را انتخاب کن، یک پرداخت بفرست، تمام.</i>",
   "home.choose": "چی می‌خوای بخری؟",
@@ -117,10 +117,10 @@ export const fa: Partial<Locale> = {
   "lang.set": "✅ زبان روی {language} تنظیم شد.",
 
   // ---- help ----
-  "help.title": "<b>Best B4U چطور کار می‌کند</b>",
+  "help.title": "<b>{brand} چطور کار می‌کند</b>",
   "help.body":
     "1️⃣ یک محصول انتخاب کن — گیفت کارت، Stars، Nitro، VPN، کارت پیش‌پرداخت\n2️⃣ مبلغ و گیرنده را مشخص کن\n3️⃣ یک کوین انتخاب کن و یک پرداخت به آدرسی که می‌دهیم بفرست\n4️⃣ محصولت همین‌جا تحویل می‌شود، معمولاً در چند دقیقه\n\n💡 <b>خوب است بدانی</b>\n• بدون ثبت‌نام، بدون KYC — فقط یک پرداخت کافی است\n• قیمت با تأیید تو قفل می‌شود\n• کدها زیر 🧾 سفارش‌های من ذخیره می‌مانند\n• قدرت‌گرفته از <a href=\"https://uswap.net\">uSwap</a>",
-  "help.support": "سؤالی داری؟ @uSwapSupport",
+  "help.support": "سؤالی داری؟ {support}",
 
   // ---- misc ----
   "error.generic": "⚠️ مشکلی پیش آمد. لطفاً دوباره امتحان کن.",

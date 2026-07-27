@@ -2,7 +2,7 @@ import type { Locale } from "../index.ts";
 
 export const zh: Partial<Locale> = {
   // ---- home ----
-  "home.title": "<b>Best B4U</b> — 用加密货币购买数字商品",
+  "home.title": "<b>{brand}</b> — 用加密货币购买数字商品",
   "home.body":
     "礼品卡、Telegram Stars 和 Premium、Discord Nitro、VPN 时长、预付卡 — 用你手里的币直接付款。\n\n<i>无需账号，无需银行卡。选好商品，付一笔款，搞定。</i>",
   "home.choose": "想买点什么？",
@@ -117,10 +117,10 @@ export const zh: Partial<Locale> = {
   "lang.set": "✅ 语言已设置为{language}。",
 
   // ---- help ----
-  "help.title": "<b>Best B4U 使用方法</b>",
+  "help.title": "<b>{brand} 使用方法</b>",
   "help.body":
     "1️⃣ 选一个商品 — 礼品卡、Stars、Nitro、VPN、预付卡\n2️⃣ 选择金额和收货人\n3️⃣ 选一种币，按我们给的地址付一笔款\n4️⃣ 商品直接在这里送达，通常几分钟搞定\n\n💡 <b>小贴士</b>\n• 无需注册，无需 KYC — 付款即可\n• 确认后价格即锁定\n• 兑换码保存在 🧾 我的订单里\n• 由 <a href=\"https://uswap.net\">uSwap</a> 提供技术支持",
-  "help.support": "有问题？@uSwapSupport",
+  "help.support": "有问题？{support}",
 
   // ---- misc ----
   "error.generic": "⚠️ 出了点问题，请重试。",
