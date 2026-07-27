@@ -1,0 +1,23 @@
+# Fleet deployment (Coolify docker-compose build pack).
+# The named volume is defined HERE so the SQLite state (tenants, orders,
+# encrypted tokens) survives every redeploy.
+services:
+  fleet:
+    build: .
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - BOT_MODE=${BOT_MODE:-both}
+      - USWAP_API_KEY=${USWAP_API_KEY}
+      - USWAP_API_BASE=${USWAP_API_BASE:-https://partner-api.uswap.net}
+      - FATHER_BOT_TOKEN=${FATHER_BOT_TOKEN}
+      - FATHER_ORG_ID=${FATHER_ORG_ID}
+      - FLEET_TOKEN_KEY=${FLEET_TOKEN_KEY}
+      - ADMIN_USER_IDS=${ADMIN_USER_IDS}
+      - SUPPORT_HANDLE=${SUPPORT_HANDLE:-@uSwapSupport}
+      - DATABASE_PATH=/app/data/bestb4u.db
+    volumes:
+      - b4u_data:/app/data
+
+volumes:
+  b4u_data:
