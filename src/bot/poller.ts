@@ -104,7 +104,8 @@ export async function checkOrderNow(api: Api, order: OrderRow) {
             productLabel: order.product_label,
             amountHuman: order.deposit_amount ?? "",
             paySymbol: order.deposit_asset ?? "",
-            payNetworkName: "",
+            // pay_label is "SYMBOL (Network)" — recover the network name.
+            payNetworkName: order.pay_label.match(/\(([^)]+)\)\s*$/)?.[1] ?? "",
             address: order.deposit_address ?? "",
             memo: order.deposit_memo,
             expiresAt: order.expires_at,

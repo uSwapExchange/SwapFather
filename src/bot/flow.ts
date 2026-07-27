@@ -272,25 +272,44 @@ export function afterAmount(s: FlowSession): ScreenId {
   return s.screen;
 }
 
-/** Validate a typed amount against the leaf's bounds. Returns error key or null. */
-export function validateAmount(s: FlowSession, input: string): string | null {
+/**
+ * Normalize a typed amount. "100,000" is a thousands separator, "7,50" is a
+ * European decimal comma; fractional input on count products (stars, months)
+ * is ambiguous and rejected outright.
+ */
+export function normalizeAmountInput(input: string, decimals: number): string {
+  let v = input.replace(/[$\s]/g, "");
+  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(v)) v = v.replaceAll(",", "");
+  else v = v.replace(",", ".");
+  if (decimals === 0 && v.includes(".") && !/\.0*$/.test(v.slice(v.indexOf(".")))) {
+    throw new Error(`fractional amount on integer product: ${input}`);
+  }
+  if (decimals === 0) v = v.split(".")[0]!;
+  return v;
+}
+
+/**
+ * Validate a typed amount against the leaf's bounds.
+ * Returns the canonical human string, or null if invalid.
+ */
+export function parseAmount(s: FlowSession, input: string): string | null {
   const draft = s.draft!;
   const c = draft.leaf.chain;
   const decimals = leafAmountDecimals(draft.leaf);
   let raw: bigint;
   try {
-    raw = BigInt(humanToRaw(input.replace(/[$\s]/g, ""), decimals));
+    raw = BigInt(humanToRaw(normalizeAmountInput(input, decimals), decimals));
   } catch {
-    return "amount.invalid";
+    return null;
   }
   const min = BigInt(c.amount_min_raw ?? "1");
   const max = BigInt(c.amount_max_raw ?? raw.toString());
-  if (raw < min || raw > max) return "amount.invalid";
-  if (c.amount_step_raw && raw % BigInt(c.amount_step_raw) !== 0n) return "amount.invalid";
+  if (raw < min || raw > max) return null;
+  if (c.amount_step_raw && raw % BigInt(c.amount_step_raw) !== 0n) return null;
   if (c.amount_options_raw?.length && !c.amount_options_raw.includes(raw.toString())) {
-    return "amount.invalid";
+    return null;
   }
-  return null;
+  return rawToHuman(raw.toString(), decimals);
 }
 
 /** Normalize a destination input (e.g. strip @ from usernames). */
@@ -392,14 +411,31 @@ export interface CommitResult {
 }
 
 /**
- * Commit the quoted plan: POST /v1/bridges/open. Automatically re-quotes once
- * if the draft expired between quoting and confirming.
+ * Thrown when the draft expired at commit time and the fresh re-quote costs
+ * more than the price the user approved — the UI must re-confirm, never
+ * silently charge more.
+ */
+export class RepriceRequiredError extends Error {
+  constructor() {
+    super("price moved above the approved amount; re-confirmation required");
+    this.name = "RepriceRequiredError";
+  }
+}
+
+/**
+ * Commit the quoted plan: POST /v1/bridges/open. If the draft expired between
+ * quoting and confirming, re-quotes once and retries — but only while the new
+ * price stays within the ceiling derived from what the user confirmed.
  */
 export async function commit(
   s: FlowSession,
   externalId: string,
 ): Promise<CommitResult> {
   const draft = s.draft!;
+  // The ceiling binds to the price the user APPROVED — never to a re-quote.
+  const approvedCeilingRaw = (
+    (BigInt(draft.quote!.source_amount_raw) * 102n) / 100n
+  ).toString();
   let attempt = 0;
   for (;;) {
     attempt++;
@@ -418,14 +454,13 @@ export async function commit(
           leg_plan_ids: q.leg_plan_ids,
           expires_at: q.expires_at,
           request_hash: q.request_hash,
-          // Reject live repricing more than ~2% above what the user approved.
-          source_amount_ceiling_raw: (
-            (BigInt(q.source_amount_raw) * 102n) / 100n
-          ).toString(),
+          source_amount_ceiling_raw: approvedCeilingRaw,
           external_id: externalId,
           metadata: { source: "best-b4u" },
         },
-        externalId,
+        // Key includes the draft so a retry with a fresh draft (different
+        // body) doesn't collide with the first attempt's idempotency record.
+        `${externalId}-${q.draft_id}`,
       );
       return toCommitResult(res, draft.payChainId!, draft.payDecimals ?? 0);
     } catch (err) {
@@ -435,6 +470,9 @@ export async function commit(
       if (retryable && attempt === 1) {
         logger.info("quote expired at commit; re-quoting", { externalId });
         await fetchQuote(s);
+        if (BigInt(draft.quote!.source_amount_raw) > BigInt(approvedCeilingRaw)) {
+          throw new RepriceRequiredError();
+        }
         continue;
       }
       throw err;
@@ -448,13 +486,16 @@ function toCommitResult(
   payDecimals: number,
 ): CommitResult {
   const endpoints = res.bridge.ingress_endpoints ?? [];
-  const ep =
-    endpoints.find(
-      (e) =>
-        (e as { network_id?: string; chain?: string }).network_id === payChainId ||
-        (e as { network_id?: string; chain?: string }).chain === payChainId,
-    ) ?? endpoints[0];
-  if (!ep) throw new Error("bridge has no ingress endpoints");
+  // NEVER fall back to another chain's endpoint — showing a wrong-network
+  // deposit address is how funds get lost.
+  const ep = endpoints.find(
+    (e) =>
+      (e as { network_id?: string; chain?: string }).network_id === payChainId ||
+      (e as { network_id?: string; chain?: string }).chain === payChainId,
+  );
+  if (!ep) {
+    throw new Error(`no ingress endpoint for source chain ${payChainId}`);
+  }
   const intent = res.intent as { source_amount_raw?: string } & typeof res.intent;
   // Prefer the committed intent's (re-quoted) source amount.
   const sourceRaw = intent.source_amount_raw;

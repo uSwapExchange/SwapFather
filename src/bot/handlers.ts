@@ -35,7 +35,7 @@ import type { Screen } from "./screens.ts";
 import { markup, stripIcons } from "./keyboard.ts";
 import { customEmojiEnabled, disableCustomEmoji, stripTgEmoji } from "./emoji.ts";
 import { uswap, UswapApiError } from "../uswap/client.ts";
-import { rawToHuman } from "../lib/format.ts";
+import { esc, rawToHuman } from "../lib/format.ts";
 import { logger } from "../lib/logger.ts";
 import { checkOrderNow } from "./poller.ts";
 
@@ -123,8 +123,11 @@ async function showCurrent(u: Uctx) {
     case "browse":
       return showBrowse(u);
     case "amount":
+      // Arm free-text input: presets are one tap, but typing "75" works too.
+      s.awaiting = "amount";
       return showScreen(u, screens.renderAmount(u.t, s.draft!));
     case "dest":
+      s.awaiting = "dest";
       return showScreen(u, screens.renderDest(u.t, s.draft!, u.ctx.from?.username));
     case "pay":
       if (!s.payChoices) await flow.loadPayChoices(s);
@@ -171,7 +174,7 @@ async function showQuoteError(u: Uctx, err: unknown) {
       u.s.awaiting = "dest";
       persistSession(u.userId, u.s);
       const scr = screens.renderDest(u.t, u.s.draft!, u.ctx.from?.username);
-      scr.text = `⚠️ ${reason}\n\n${scr.text}`;
+      scr.text = `⚠️ ${esc(reason)}\n\n${scr.text}`;
       return showScreen(u, scr);
     }
   } else {
@@ -180,7 +183,7 @@ async function showQuoteError(u: Uctx, err: unknown) {
   const s = u.s;
   s.screen = "pay";
   const scr = screens.renderPay(u.t, s.draft!, s.payChoices ?? [], s.payMore ?? false);
-  scr.text = `${u.t("quote.error", { reason })}\n\n${scr.text}`;
+  scr.text = `${u.t("quote.error", { reason: esc(reason) })}\n\n${scr.text}`;
   return showScreen(u, scr);
 }
 
@@ -195,6 +198,14 @@ async function confirmAndOpen(u: Uctx) {
   try {
     result = await flow.commit(s, externalId);
   } catch (err) {
+    if (err instanceof flow.RepriceRequiredError) {
+      // The approved price expired and the market moved — show the fresh
+      // quote (already in the draft) and let the user decide again.
+      s.screen = "quote";
+      const scr = screens.renderQuote(u.t, s.draft!);
+      scr.text = `⚠️ ${u.t("error.expiredQuote")}\n\n${scr.text}`;
+      return showScreen(u, scr);
+    }
     return showQuoteError(u, err);
   }
 
@@ -423,7 +434,12 @@ async function handleCallback(ctx: Context, data: string) {
     // which are safe from any message).
     const msgId = ctx.callbackQuery?.message?.message_id;
     const isOrderCb = data.startsWith("or") || data.startsWith("ost:") || data.startsWith("da:");
-    if (!isOrderCb && s.messageId && msgId && msgId !== s.messageId) {
+    const isStale = Boolean(s.messageId && msgId && msgId !== s.messageId);
+    if (isStale && data === "h") {
+      // Home works from ANY message (e.g. an old deposit card) — open a
+      // fresh anchor instead of hijacking whatever the old message shows.
+      s.messageId = undefined;
+    } else if (isStale && !isOrderCb) {
       await ctx
         .answerCallbackQuery({ text: u.t("browse.stale"), show_alert: false })
         .catch(() => {});
@@ -553,12 +569,14 @@ async function handleCallback(ctx: Context, data: string) {
           s.awaiting = "dest";
           return showScreen(u, screens.renderDest(u.t, s.draft!, undefined));
         }
+        s.awaiting = null;
         s.draft!.destination = username;
         s.screen = "pay";
         await flow.loadPayChoices(s);
         return showCurrent(u);
       }
       case "ds": {
+        s.awaiting = null;
         s.draft!.destination = undefined;
         s.screen = "pay";
         await flow.loadPayChoices(s);
@@ -578,6 +596,13 @@ async function handleCallback(ctx: Context, data: string) {
         return showCurrent(u);
       }
       case "cf":
+        // Double-tap guard: the first tap clears the draft when it finishes,
+        // so a queued second tap must not re-enter with empty state.
+        if (!s.draft?.quote) {
+          return ctx
+            .answerCallbackQuery({ text: u.t("browse.stale"), show_alert: false })
+            .catch(() => {}) as Promise<void>;
+        }
         return confirmAndOpen(u);
       case "cx":
         s.draft = undefined;
@@ -642,8 +667,8 @@ async function handleText(ctx: Context) {
     const text = ctx.message?.text ?? "";
     switch (s.awaiting) {
       case "amount": {
-        const err = flow.validateAmount(s, text);
-        if (err) {
+        const canonical = flow.parseAmount(s, text);
+        if (canonical === null) {
           const c = s.draft!.leaf.chain;
           const decimals = c.amount_decimals ?? s.draft!.leaf.decimals ?? 0;
           await ctx.reply(
@@ -655,7 +680,7 @@ async function handleText(ctx: Context) {
           return;
         }
         s.awaiting = null;
-        flow.setAmount(s, text.replace(/[$\s]/g, "").replace(",", "."));
+        flow.setAmount(s, canonical);
         await deleteUserMessage(ctx);
         if (s.screen === "pay") await flow.loadPayChoices(s);
         return showCurrent(u);

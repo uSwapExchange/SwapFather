@@ -429,9 +429,12 @@ export function renderOrderDetail(
         keyboard.push([copyBtn(`${UI.copy} ${f.label}`, f.value)]);
       }
       for (const action of item.actions ?? []) {
-        keyboard.push([
-          btn(actionLabel(t, action), `da:${order.id}:${item.id}:${action}`.slice(0, 64)),
-        ]);
+        // callback_data is capped at 64 bytes — skip (never truncate) actions
+        // that would not round-trip intact.
+        const data = `da:${order.id}:${item.id}:${action}`;
+        if (Buffer.byteLength(data) <= 64) {
+          keyboard.push([btn(actionLabel(t, action), data)]);
+        }
       }
     }
     lines.push("", t("order.deliveryHint"));
