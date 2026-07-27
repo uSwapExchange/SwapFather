@@ -1,0 +1,470 @@
+/**
+ * Purchase-flow orchestration: everything between "user tapped a button"
+ * and "screen rendered". Handlers (handlers.ts) stay thin; this module owns
+ * the state machine.
+ *
+ * Screen graph:
+ *   home → browse* → amount → dest? → pay → paynet? → quote → deposit
+ */
+
+import type { Translator } from "../i18n/index.ts";
+import { uswap, UswapApiError } from "../uswap/client.ts";
+import type {
+  BridgeOpenResponse,
+  LeafItem,
+  LevelResponse,
+  QuoteResponse,
+} from "../uswap/types.ts";
+import {
+  leafAmountDecimals,
+  leafLockedDestination,
+  leafNeedsDestination,
+  productLabel,
+} from "./catalog.ts";
+import type { NavLevel, PageItem, PayAssetChoice, Session } from "./session.ts";
+import { humanToRaw, rawToHuman } from "../lib/format.ts";
+import { logger } from "../lib/logger.ts";
+
+export type ScreenId =
+  | "home"
+  | "browse"
+  | "amount"
+  | "dest"
+  | "pay"
+  | "paynet"
+  | "quote"
+  | "deposit"
+  | "orders"
+  | "order"
+  | "lang"
+  | "help";
+
+export interface FlowSession extends Session {
+  screen?: ScreenId;
+  /** Cached meta of the current browse level (for pills/pagination). */
+  meta?: LevelResponse["meta"];
+}
+
+// ---------- browse ----------
+
+/**
+ * Keep only the leaf fields the flow consumes — huge levels (2000+ Discord
+ * OG usernames) would otherwise bloat the persisted session by megabytes.
+ */
+function slimLeaf(item: LeafItem): LeafItem {
+  const c = item.chain;
+  return {
+    asset_v1: item.asset_v1,
+    symbol: item.symbol,
+    name: item.name,
+    decimals: item.decimals,
+    chain: {
+      id: c.id,
+      name: c.name,
+      subtitle: c.subtitle,
+      address_prompt: c.address_prompt,
+      destination_required: c.destination_required,
+      destination_optional: c.destination_optional,
+      destination_address: c.destination_address,
+      destination_label: c.destination_label,
+      destination_locked: c.destination_locked,
+      amount_min_raw: c.amount_min_raw,
+      amount_max_raw: c.amount_max_raw,
+      amount_decimals: c.amount_decimals,
+      amount_options_raw: c.amount_options_raw,
+      amount_step_raw: c.amount_step_raw,
+      unit_label: c.unit_label,
+      unit_price_usd_buy: c.unit_price_usd_buy,
+      discount_min_bps: c.discount_min_bps,
+      discount_max_bps: c.discount_max_bps,
+      out_of_stock: c.out_of_stock,
+      availability_reason: c.availability_reason,
+      parent_group_name: c.parent_group_name,
+      group_name: c.group_name,
+    },
+  };
+}
+
+function toPageItems(res: LevelResponse): PageItem[] {
+  return res.items.map((it): PageItem => {
+    if (it.kind === "leaf") {
+      const c = it.item.chain;
+      const label = c.subtitle ? `${c.name} · ${c.subtitle}` : c.name;
+      return { k: "l", item: slimLeaf(it.item), label };
+    }
+    const n = it.node;
+    // A drill with exactly one leaf child IS that product — treat it as a
+    // leaf so a tap goes straight to configuration (no extra fetch), and
+    // borrow the child's subtitle (price range / discount) for the label.
+    const single =
+      n.only_item ?? (n.child_count === 1 ? n.first_item : undefined);
+    const subtitle = n.subtitle ?? single?.chain.subtitle;
+    const label = subtitle ? `${n.name} · ${subtitle}` : n.name;
+    return {
+      k: "d",
+      segment: n.segment,
+      label,
+      onlyItem: single ? slimLeaf(single) : undefined,
+      oos: n.out_of_stock,
+    };
+  });
+}
+
+/**
+ * Fetch a catalog level into the session, auto-descending through
+ * single-child levels (e.g. the gift-card country list with one country).
+ */
+export async function enterLevel(
+  s: FlowSession,
+  nav: NavLevel,
+  cursor: string | null = null,
+): Promise<void> {
+  let current = nav;
+  let curCursor = cursor;
+  for (let depth = 0; depth < 4; depth++) {
+    const res = await uswap.level({
+      path: { asset: current.asset, segments: current.segments },
+      side: "to",
+      query: current.query || undefined,
+      category: current.category || undefined,
+      cursor: curCursor ?? undefined,
+    });
+    const page = toPageItems(res);
+
+    // Auto-skip levels that contain exactly one drill (per meta hint).
+    const first = page[0];
+    if (
+      res.meta.auto_skip_single &&
+      page.length === 1 &&
+      first &&
+      first.k === "d" &&
+      !current.query
+    ) {
+      current = {
+        asset: current.asset,
+        segments: [...current.segments, first.segment],
+        cursorStack: [],
+        nextCursor: null,
+      };
+      curCursor = null;
+      continue;
+    }
+
+    current.title = res.meta.title;
+    if (!current.cursorStack?.length) current.cursorStack = [curCursor];
+    current.nextCursor = res.cursor;
+    current.offset ??= 0;
+    current.pageNo ??= 1;
+    current.categoryIds = res.meta.categories?.map((c) => c.id);
+    s.meta = res.meta;
+    s.page = page;
+    // Replace/append nav level
+    const topIdx = s.nav.findIndex(
+      (l) => l.asset === current.asset && sameSegments(l.segments, current.segments),
+    );
+    if (topIdx === -1) s.nav.push(current);
+    else s.nav[topIdx] = current;
+    // Drop anything deeper than this level
+    s.nav = s.nav.slice(0, s.nav.indexOf(current) + 1);
+    s.screen = "browse";
+    return;
+  }
+  throw new Error("catalog auto-descend loop exceeded depth 4");
+}
+
+/** How many item buttons fit on one browse screen. */
+export const PAGE_SIZE = 24;
+
+function sameSegments(a: { id: string }[], b: { id: string }[]): boolean {
+  return a.length === b.length && a.every((s, i) => s.id === b[i]!.id);
+}
+
+export function currentNav(s: FlowSession): NavLevel | undefined {
+  return s.nav[s.nav.length - 1];
+}
+
+/** Fetch the current nav level again (page 1) — used after filter changes. */
+export async function refreshLevel(s: FlowSession): Promise<void> {
+  const nav = currentNav(s);
+  if (!nav) return;
+  nav.cursorStack = [null];
+  nav.offset = 0;
+  nav.pageNo = 1;
+  await enterLevel(s, nav, null);
+}
+
+/**
+ * Pagination is two-layered: big server pages are sliced into PAGE_SIZE
+ * screens locally; when the local slice runs out we follow the server cursor.
+ */
+export async function pageNext(s: FlowSession): Promise<void> {
+  const nav = currentNav(s);
+  if (!nav || !s.page) return;
+  const offset = nav.offset ?? 0;
+  if (offset + PAGE_SIZE < s.page.length) {
+    nav.offset = offset + PAGE_SIZE;
+    nav.pageNo = (nav.pageNo ?? 1) + 1;
+    return;
+  }
+  if (!nav.nextCursor) return;
+  const cursor = nav.nextCursor;
+  await enterLevel(s, nav, cursor);
+  nav.cursorStack.push(cursor);
+  nav.offset = 0;
+  nav.pageNo = (nav.pageNo ?? 1) + 1;
+}
+
+export async function pagePrev(s: FlowSession): Promise<void> {
+  const nav = currentNav(s);
+  if (!nav || !s.page) return;
+  const offset = nav.offset ?? 0;
+  if (offset > 0) {
+    nav.offset = Math.max(0, offset - PAGE_SIZE);
+    nav.pageNo = Math.max(1, (nav.pageNo ?? 2) - 1);
+    return;
+  }
+  if (nav.cursorStack.length <= 1) return;
+  nav.cursorStack.pop();
+  const cursor = nav.cursorStack[nav.cursorStack.length - 1] ?? null;
+  const keptStack = [...nav.cursorStack];
+  await enterLevel(s, nav, cursor);
+  nav.cursorStack = keptStack;
+  // Land on the LAST local slice of the previous server page.
+  const slices = Math.max(1, Math.ceil(s.page.length / PAGE_SIZE));
+  nav.offset = (slices - 1) * PAGE_SIZE;
+  nav.pageNo = Math.max(1, (nav.pageNo ?? 2) - 1);
+}
+
+// ---------- configure ----------
+
+/** Begin a purchase draft from a selected leaf. Returns the next screen. */
+export function startDraft(s: FlowSession, leaf: LeafItem): ScreenId {
+  s.draft = { leaf, productLabel: productLabel(leaf) };
+  const c = leaf.chain;
+  const min = c.amount_min_raw ?? "1";
+  const max = c.amount_max_raw ?? min;
+  if (min === max) {
+    // Single fixed quantity (rented numbers, OG accounts) — skip amount step.
+    s.draft.amountHuman = rawToHuman(min, leafAmountDecimals(leaf));
+    return afterAmount(s);
+  }
+  s.screen = "amount";
+  return s.screen;
+}
+
+export function setAmount(s: FlowSession, human: string): ScreenId {
+  const draft = s.draft!;
+  draft.amountHuman = human;
+  return afterAmount(s);
+}
+
+export function afterAmount(s: FlowSession): ScreenId {
+  const draft = s.draft!;
+  const locked = leafLockedDestination(draft.leaf);
+  if (locked) {
+    draft.destination = locked;
+    s.screen = "pay";
+  } else if (leafNeedsDestination(draft.leaf)) {
+    s.screen = "dest";
+  } else {
+    s.screen = "pay";
+  }
+  return s.screen;
+}
+
+/** Validate a typed amount against the leaf's bounds. Returns error key or null. */
+export function validateAmount(s: FlowSession, input: string): string | null {
+  const draft = s.draft!;
+  const c = draft.leaf.chain;
+  const decimals = leafAmountDecimals(draft.leaf);
+  let raw: bigint;
+  try {
+    raw = BigInt(humanToRaw(input.replace(/[$\s]/g, ""), decimals));
+  } catch {
+    return "amount.invalid";
+  }
+  const min = BigInt(c.amount_min_raw ?? "1");
+  const max = BigInt(c.amount_max_raw ?? raw.toString());
+  if (raw < min || raw > max) return "amount.invalid";
+  if (c.amount_step_raw && raw % BigInt(c.amount_step_raw) !== 0n) return "amount.invalid";
+  if (c.amount_options_raw?.length && !c.amount_options_raw.includes(raw.toString())) {
+    return "amount.invalid";
+  }
+  return null;
+}
+
+/** Normalize a destination input (e.g. strip @ from usernames). */
+export function normalizeDestination(s: FlowSession, input: string): string {
+  const prompt = s.draft?.leaf.chain.address_prompt ?? "";
+  let value = input.trim();
+  if (/username/i.test(prompt)) value = value.replace(/^@/, "");
+  return value;
+}
+
+// ---------- payment picker ----------
+
+export async function loadPayChoices(s: FlowSession): Promise<void> {
+  const draft = s.draft!;
+  const res = await uswap.assets({
+    side: "from",
+    counterpart_asset_v1: draft.leaf.asset_v1,
+  });
+  s.payChoices = res.items
+    .filter((a) => a.category === "Crypto")
+    .map((a) => ({
+      assetId: a.asset_id,
+      symbol: a.symbol,
+      name: a.name,
+      networks: a.networks.map((n) => ({
+        asset_v1: n.asset_v1,
+        chain_id: n.chain_id,
+        chain_name: n.chain_name,
+        decimals: n.decimals,
+      })),
+    }));
+  s.payMore = false;
+  s.screen = "pay";
+}
+
+export function pickPayAsset(s: FlowSession, idx: number): ScreenId {
+  const choice = s.payChoices?.[idx];
+  if (!choice) return s.screen ?? "pay";
+  if (choice.networks.length > 1) {
+    s.payNetChoice = choice;
+    s.screen = "paynet";
+    return s.screen;
+  }
+  return selectPayNetwork(s, choice, 0);
+}
+
+export function selectPayNetwork(
+  s: FlowSession,
+  choice: PayAssetChoice,
+  netIdx: number,
+): ScreenId {
+  const net = choice.networks[netIdx];
+  if (!net) return s.screen ?? "pay";
+  const draft = s.draft!;
+  draft.payAssetV1 = net.asset_v1;
+  draft.paySymbol = choice.symbol;
+  draft.payChainId = net.chain_id;
+  draft.payChainName = net.chain_name;
+  draft.payDecimals = net.decimals;
+  s.screen = "quote";
+  return s.screen;
+}
+
+// ---------- quote & commit ----------
+
+export async function fetchQuote(s: FlowSession): Promise<QuoteResponse> {
+  const draft = s.draft!;
+  const q = await uswap.quote({
+    source_asset_v1: draft.payAssetV1!,
+    destination_asset_v1: draft.leaf.asset_v1,
+    ...(draft.destination ? { destination_address: draft.destination } : {}),
+    amount: draft.amountHuman!,
+    input_side: "to",
+    input_type: "human",
+  });
+  draft.quote = {
+    draft_id: q.draft_id,
+    plan_id: q.plan_id,
+    leg_plan_ids: q.legs.map((l) => l.leg_plan_id),
+    expires_at: q.expires_at,
+    request_hash: q.request_hash,
+    source_amount_raw: q.source_amount_raw,
+    source_amount_usd: q.source_amount_usd,
+    destination_amount_raw: q.destination_amount_raw,
+    destination_amount_usd: q.destination_amount_usd,
+  };
+  s.screen = "quote";
+  return q;
+}
+
+export interface CommitResult {
+  bridgeId: string;
+  intentId: string;
+  status: string;
+  depositAddress: string;
+  depositMemo: string | null;
+  depositAmountHuman: string;
+  expiresAt: string | null;
+}
+
+/**
+ * Commit the quoted plan: POST /v1/bridges/open. Automatically re-quotes once
+ * if the draft expired between quoting and confirming.
+ */
+export async function commit(
+  s: FlowSession,
+  externalId: string,
+): Promise<CommitResult> {
+  const draft = s.draft!;
+  let attempt = 0;
+  for (;;) {
+    attempt++;
+    const q = draft.quote!;
+    try {
+      const res = await uswap.openBridge(
+        {
+          source_asset_v1: draft.payAssetV1!,
+          destination_asset_v1: draft.leaf.asset_v1,
+          ...(draft.destination ? { destination_address: draft.destination } : {}),
+          amount: draft.amountHuman!,
+          input_side: "to",
+          input_type: "human",
+          draft_id: q.draft_id,
+          plan_id: q.plan_id,
+          leg_plan_ids: q.leg_plan_ids,
+          expires_at: q.expires_at,
+          request_hash: q.request_hash,
+          // Reject live repricing more than ~2% above what the user approved.
+          source_amount_ceiling_raw: (
+            (BigInt(q.source_amount_raw) * 102n) / 100n
+          ).toString(),
+          external_id: externalId,
+          metadata: { source: "best-b4u" },
+        },
+        externalId,
+      );
+      return toCommitResult(res, draft.payChainId!, draft.payDecimals ?? 0);
+    } catch (err) {
+      const retryable =
+        err instanceof UswapApiError &&
+        ["quote_not_found", "quote_expired", "stale_plan"].includes(err.code);
+      if (retryable && attempt === 1) {
+        logger.info("quote expired at commit; re-quoting", { externalId });
+        await fetchQuote(s);
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+function toCommitResult(
+  res: BridgeOpenResponse,
+  payChainId: string,
+  payDecimals: number,
+): CommitResult {
+  const endpoints = res.bridge.ingress_endpoints ?? [];
+  const ep =
+    endpoints.find(
+      (e) =>
+        (e as { network_id?: string; chain?: string }).network_id === payChainId ||
+        (e as { network_id?: string; chain?: string }).chain === payChainId,
+    ) ?? endpoints[0];
+  if (!ep) throw new Error("bridge has no ingress endpoints");
+  const intent = res.intent as { source_amount_raw?: string } & typeof res.intent;
+  // Prefer the committed intent's (re-quoted) source amount.
+  const sourceRaw = intent.source_amount_raw;
+  return {
+    bridgeId: res.bridge.id,
+    intentId: res.intent.id,
+    status: res.intent.status,
+    depositAddress: ep.address,
+    depositMemo: ep.memo ?? null,
+    depositAmountHuman: sourceRaw ? rawToHuman(sourceRaw, payDecimals) : "",
+    expiresAt: res.intent.expires_at,
+  };
+}
