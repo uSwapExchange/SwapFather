@@ -138,4 +138,8 @@ export const hi: Partial<Locale> = {
   "swap.amountPrompt": "कितना स्वैप करना है? <b>{symbol}</b> में राशि भेजें (जैसे <code>0.1</code>) या डॉलर में (जैसे <code>$100</code>):",
   "swap.youreceive": "आपको मिलेगा (अनुमानित)",
   "swap.invalidAmount": "कोई संख्या भेजें, जैसे <code>0.25</code> या <code>$100</code>।",
+  "swap.minDeposit": "न्यूनतम: <b>{min}</b> (≈ {usd})",
+  "btn.refundAddr": "↩️ रिफ़ंड पता जोड़ें",
+  "refund.prompt": "वैकल्पिक सुरक्षा: एक <b>{symbol}</b> पता भेजें ताकि इस ऑर्डर में कुछ गलत होने पर अपने आप रिफ़ंड हो जाए।",
+  "refund.set": "✅ इस ऑर्डर के लिए रिफ़ंड पता सहेज लिया गया।",
 };

@@ -138,4 +138,8 @@ export const fa: Partial<Locale> = {
   "swap.amountPrompt": "چقدر تبدیل می‌کنید؟ مقدار را به <b>{symbol}</b> (مثل <code>0.1</code>) یا دلار (مثل <code>$100</code>) بفرستید:",
   "swap.youreceive": "دریافتی شما (تقریبی)",
   "swap.invalidAmount": "یک عدد بفرستید، مثل <code>0.25</code> یا <code>$100</code>.",
+  "swap.minDeposit": "حداقل: <b>{min}</b> (≈ {usd})",
+  "btn.refundAddr": "↩️ افزودن آدرس بازپرداخت",
+  "refund.prompt": "شبکه امنیتی اختیاری: یک آدرس <b>{symbol}</b> بفرستید تا در صورت بروز مشکل در این سفارش، بازپرداخت خودکار انجام شود.",
+  "refund.set": "✅ آدرس بازپرداخت برای این سفارش ذخیره شد.",
 };

@@ -138,4 +138,8 @@ export const de: Partial<Locale> = {
   "swap.amountPrompt": "Wie viel tauschst du? Sende einen Betrag in <b>{symbol}</b> (z. B. <code>0.1</code>) oder in Dollar (z. B. <code>$100</code>):",
   "swap.youreceive": "Du erhältst (geschätzt)",
   "swap.invalidAmount": "Sende eine Zahl wie <code>0.25</code> oder <code>$100</code>.",
+  "swap.minDeposit": "Minimum: <b>{min}</b> (≈ {usd})",
+  "btn.refundAddr": "↩️ Rückerstattungsadresse hinzufügen",
+  "refund.prompt": "Optionales Sicherheitsnetz: sende eine <b>{symbol}</b>-Adresse für automatische Rückerstattung, falls bei dieser Bestellung etwas schiefgeht.",
+  "refund.set": "✅ Rückerstattungsadresse für diese Bestellung gespeichert.",
 };

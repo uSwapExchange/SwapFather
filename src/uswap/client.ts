@@ -36,7 +36,7 @@ export class UswapApiError extends Error {
 }
 
 async function request<T>(
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PATCH",
   path: string,
   opts: { body?: unknown; idempotencyKey?: string } = {},
 ): Promise<T> {
@@ -112,6 +112,27 @@ export const uswap = {
 
   quote(body: QuoteRequest): Promise<QuoteResponse> {
     return request("POST", "/v1/quotes", { body: compact({ ...body }) });
+  },
+
+  /** Assets available on one chain, with min-deposit bounds. */
+  networkAssets(chain: string): Promise<{
+    items: {
+      asset_v1: string;
+      symbol: string;
+      min_deposit: { raw: string; human: string; usd: string } | null;
+    }[];
+  }> {
+    return request("GET", `/v1/catalog/networks/${encodeURIComponent(chain)}/assets`);
+  },
+
+  /** Partial policy update — used to attach a refund destination. */
+  patchBridgePolicies(
+    bridgeId: string,
+    body: {
+      refund_destination?: { asset_v1: string; address: string; memo?: string | null };
+    },
+  ): Promise<unknown> {
+    return request("PATCH", `/v1/bridges/${bridgeId}/policies`, { body });
   },
 
   /** Public: resolve a creator code to a TTL-bound referral token. */

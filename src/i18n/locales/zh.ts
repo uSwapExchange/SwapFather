@@ -138,4 +138,8 @@ export const zh: Partial<Locale> = {
   "swap.amountPrompt": "要兑换多少？发送 <b>{symbol}</b> 数量（如 <code>0.1</code>）或美元金额（如 <code>$100</code>）：",
   "swap.youreceive": "预计收到",
   "swap.invalidAmount": "请发送数字，如 <code>0.25</code> 或 <code>$100</code>。",
+  "swap.minDeposit": "最低：<b>{min}</b>（≈ {usd}）",
+  "btn.refundAddr": "↩️ 添加退款地址",
+  "refund.prompt": "可选保障：发送一个 <b>{symbol}</b> 地址，若此订单出现问题将自动退款。",
+  "refund.set": "✅ 已为此订单保存退款地址。",
 };

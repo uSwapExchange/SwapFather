@@ -78,6 +78,9 @@ export interface Draft {
   payChainId?: string;
   payChainName?: string;
   payDecimals?: number;
+  /** Min deposit for the chosen pay asset (from the network catalog). */
+  payMinHuman?: string;
+  payMinUsd?: string;
   quote?: QuoteTuple;
 }
 
@@ -96,7 +99,10 @@ export interface Session {
     | "swaddr"
     | "swmemo"
     | "swamount"
+    | "refund"
     | null;
+  /** Order the pending refund-address input applies to. */
+  refundOrderId?: number;
   /** Payment picker state. */
   payChoices?: PayAssetChoice[];
   payMore?: boolean;

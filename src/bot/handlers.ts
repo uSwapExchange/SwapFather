@@ -16,6 +16,7 @@ import {
   insertOrder,
   setOrderMessage,
   setOrderQrMessage,
+  setOrderRefundSet,
   setUserLanguage,
   upsertUser,
   TERMINAL_ORDER_STATUSES,
@@ -174,6 +175,7 @@ async function showCurrent(u: Uctx): Promise<void> {
       return showScreen(u, screens.renderSwapMemo(u.t));
     case "swamount":
       s.awaiting = "swamount";
+      await flow.loadPayMinDeposit(s);
       return showScreen(u, screens.renderSwapAmount(u.t, s.draft!));
     case "amount":
       // Arm free-text input: presets are one tap, but typing "75" works too.
@@ -280,6 +282,7 @@ async function confirmAndOpen(u: Uctx) {
     depositAmount: result.depositAmountHuman,
     depositAsset: draft.paySymbol,
     expiresAt: result.expiresAt,
+    payAssetV1: draft.payAssetV1,
   });
 
   const scr = screens.renderDeposit(u.t, {
@@ -292,6 +295,7 @@ async function confirmAndOpen(u: Uctx) {
     memo: result.depositMemo,
     expiresAt: result.expiresAt,
     status: result.status,
+    offerRefund: true,
   });
   // The deposit card becomes the new anchor; drop the old flow message so
   // the chat doesn't end on a stale "getting the best price…" screen.
@@ -816,6 +820,19 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
         }
         return showOrderDetail(u, order.id);
       }
+      case "rf": {
+        const order = getOrder(Number(arg));
+        if (!order || order.user_id !== u.userId || order.tenant_id !== u.tenant.id) return;
+        if (!order.pay_asset_v1) return;
+        s.awaiting = "refund";
+        s.refundOrderId = order.id;
+        await ctx.api.sendMessage(
+          u.chatId,
+          u.t("refund.prompt", { symbol: esc(order.deposit_asset ?? "") }),
+          { parse_mode: "HTML" },
+        );
+        return;
+      }
       case "noop":
         return;
       default:
@@ -901,6 +918,32 @@ function makeHandleText(runUi: RunUi) {
         await deleteUserMessage(ctx);
         s.screen = "quote";
         return showCurrent(u);
+      }
+      case "refund": {
+        const order = s.refundOrderId ? getOrder(s.refundOrderId) : null;
+        s.awaiting = null;
+        s.refundOrderId = undefined;
+        if (!order || order.user_id !== u.userId || order.tenant_id !== u.tenant.id) return;
+        const address = text.trim();
+        if (address.length < 8 || address.length > 128 || !order.pay_asset_v1) {
+          await ctx.reply(u.t("dest.invalid"));
+          return;
+        }
+        try {
+          await uswap.patchBridgePolicies(order.bridge_id, {
+            refund_destination: {
+              asset_v1: order.pay_asset_v1,
+              address,
+              memo: null,
+            },
+          });
+          setOrderRefundSet(order.id);
+          await ctx.reply(u.t("refund.set"));
+        } catch (err) {
+          const msg = err instanceof UswapApiError ? err.message : u.t("error.generic");
+          await ctx.reply(`⚠️ ${msg}`);
+        }
+        return;
       }
       case "search": {
         const nav = flow.currentNav(s);

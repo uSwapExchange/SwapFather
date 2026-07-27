@@ -153,4 +153,8 @@ export const en = {
   "error.expiredQuote": "That price expired — here's a fresh one.",
   "cancel.done": "Cancelled. Send /start whenever you're ready.",
   "input.useButtons": "Use the buttons on the last message, or send /start to begin.",
+  "swap.minDeposit": "Minimum: <b>{min}</b> (≈ {usd})",
+  "btn.refundAddr": "↩️ Add refund address",
+  "refund.prompt": "Optional safety net: send a <b>{symbol}</b> address to auto-refund to if anything goes wrong with this order.",
+  "refund.set": "✅ Refund address saved for this order.",
 } as const;

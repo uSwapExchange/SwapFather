@@ -274,8 +274,18 @@ const SWAP_USD_PRESETS = [20, 50, 100, 250, 500, 1000];
 
 export function renderSwapAmount(t: Translator, draft: Draft): Screen {
   const presets = SWAP_USD_PRESETS.map((n) => btn(`$${n}`, `sa:${n}`));
+  const lines = [t("swap.amountPrompt", { symbol: esc(draft.paySymbol ?? "") })];
+  if (draft.payMinHuman) {
+    lines.push(
+      "",
+      t("swap.minDeposit", {
+        min: `${draft.payMinHuman} ${esc(draft.paySymbol ?? "")}`,
+        usd: draft.payMinUsd ? `$${draft.payMinUsd}` : "",
+      }),
+    );
+  }
   return {
-    text: t("swap.amountPrompt", { symbol: esc(draft.paySymbol ?? "") }),
+    text: lines.join("\n"),
     keyboard: [...grid(presets, 3), navRow(t)],
   };
 }
@@ -409,6 +419,8 @@ export function renderDeposit(
     memo?: string | null;
     expiresAt?: string | null;
     status: string;
+    /** Offer the optional refund-address affordance. */
+    offerRefund?: boolean;
   },
 ): Screen {
   const lines = [
@@ -431,8 +443,9 @@ export function renderDeposit(
   const keyboard: Keyboard = [
     [copyBtn(t("btn.copyAddress"), o.address), copyBtn(t("btn.copyAmount"), o.amountHuman)],
     [btn(t("btn.refresh"), `ost:${o.orderId}`)],
-    [btn(t("btn.home"), "h")],
   ];
+  if (o.offerRefund) keyboard.push([btn(t("btn.refundAddr"), `rf:${o.orderId}`)]);
+  keyboard.push([btn(t("btn.home"), "h")]);
   return { text: lines.join("\n"), keyboard };
 }
 
@@ -506,6 +519,9 @@ export function renderOrderDetail(
       copyBtn(t("btn.copyAddress"), order.deposit_address),
       copyBtn(t("btn.copyAmount"), order.deposit_amount ?? ""),
     ]);
+    if (order.pay_asset_v1 && !order.refund_set) {
+      keyboard.push([btn(t("btn.refundAddr"), `rf:${order.id}`)]);
+    }
   }
 
   if (vault?.length) {

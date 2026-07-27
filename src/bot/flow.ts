@@ -446,6 +446,25 @@ export function parseSwapAmount(
   return { amount: body, inputType: usd ? "usd" : "human" };
 }
 
+/**
+ * Best-effort minimum-deposit lookup for the chosen pay asset — shown on the
+ * swap amount screen so users don't discover the floor via a failed quote.
+ */
+export async function loadPayMinDeposit(s: FlowSession): Promise<void> {
+  const draft = s.draft;
+  if (!draft?.payChainId || !draft.payAssetV1 || draft.payMinHuman) return;
+  try {
+    const res = await uswap.networkAssets(draft.payChainId);
+    const match = res.items.find((i) => i.asset_v1 === draft.payAssetV1);
+    if (match?.min_deposit) {
+      draft.payMinHuman = match.min_deposit.human;
+      draft.payMinUsd = match.min_deposit.usd;
+    }
+  } catch (err) {
+    logger.debug("min deposit lookup failed", { err: String(err) });
+  }
+}
+
 // ---------- payment picker ----------
 
 export async function loadPayChoices(s: FlowSession): Promise<void> {

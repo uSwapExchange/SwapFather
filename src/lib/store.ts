@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS orders (
   deposit_amount TEXT,
   deposit_asset TEXT,
   expires_at TEXT,
+  pay_asset_v1 TEXT,
+  refund_set INTEGER NOT NULL DEFAULT 0,
   qr_message_id INTEGER,
   delivered_notified INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
@@ -89,11 +91,17 @@ CREATE TABLE IF NOT EXISTS father_sessions (
 );
 `);
 
-// Older fleet DBs predate the mode column.
-try {
-  db.exec("ALTER TABLE tenants ADD COLUMN mode TEXT NOT NULL DEFAULT 'shop'");
-} catch {
-  // column already exists
+// Column migrations for DBs created by older versions.
+for (const ddl of [
+  "ALTER TABLE tenants ADD COLUMN mode TEXT NOT NULL DEFAULT 'shop'",
+  "ALTER TABLE orders ADD COLUMN pay_asset_v1 TEXT",
+  "ALTER TABLE orders ADD COLUMN refund_set INTEGER NOT NULL DEFAULT 0",
+]) {
+  try {
+    db.exec(ddl);
+  } catch {
+    // column already exists
+  }
 }
 
 export interface UserRow {
@@ -189,6 +197,8 @@ export interface OrderRow {
   deposit_amount: string | null;
   deposit_asset: string | null;
   expires_at: string | null;
+  pay_asset_v1: string | null;
+  refund_set: number;
   qr_message_id: number | null;
   delivered_notified: number;
   created_at: string;
@@ -216,13 +226,14 @@ export function insertOrder(o: {
   depositAmount?: string | null;
   depositAsset?: string | null;
   expiresAt?: string | null;
+  payAssetV1?: string | null;
 }): number {
   const now = new Date().toISOString();
   const res = db
     .query(
       `INSERT INTO orders (tenant_id, user_id, chat_id, bridge_id, intent_id, status, product_label, pay_label,
-        deposit_address, deposit_memo, deposit_amount, deposit_asset, expires_at, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)`,
+        deposit_address, deposit_memo, deposit_amount, deposit_asset, expires_at, pay_asset_v1, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?15, ?14, ?14)`,
     )
     .run(
       o.tenantId,
@@ -239,8 +250,13 @@ export function insertOrder(o: {
       o.depositAsset ?? null,
       o.expiresAt ?? null,
       now,
+      o.payAssetV1 ?? null,
     );
   return Number(res.lastInsertRowid);
+}
+
+export function setOrderRefundSet(orderId: number) {
+  db.query("UPDATE orders SET refund_set = 1 WHERE id = ?1").run(orderId);
 }
 
 export function setOrderMessage(orderId: number, messageId: number) {

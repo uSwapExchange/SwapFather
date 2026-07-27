@@ -108,6 +108,7 @@ export async function checkOrderNow(api: Api, order: OrderRow): Promise<void> {
             memo: order.deposit_memo,
             expiresAt: order.expires_at,
             status: order.status,
+            offerRefund: Boolean(order.pay_asset_v1 && !order.refund_set),
           })
         : screens.renderOrderDetail(t, getOrder(order.id)!, null);
     await api
