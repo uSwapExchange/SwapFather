@@ -55,6 +55,19 @@ export const en = {
   "dest.skip": "⏭ Skip — create new account",
   "dest.invalid": "That doesn't look right — please check it and send again.",
 
+  // ---- swap ----
+  "btn.swap": "🔄 Swap crypto",
+  "swap.toTitle": "<b>What do you want to receive?</b>",
+  "swap.toSubtitle": "Swap any coin for any coin — no account needed.",
+  "swap.addrPrompt":
+    "Send the <b>{symbol}</b> address ({network}) that will receive your swap:",
+  "swap.memoPrompt":
+    "Does this address need a <b>memo/tag</b>? Send it now, or skip.",
+  "swap.amountPrompt":
+    "How much are you swapping? Send an amount in <b>{symbol}</b> (like <code>0.1</code>) or in dollars (like <code>$100</code>):",
+  "swap.youreceive": "You get (estimated)",
+  "swap.invalidAmount": "Send a number like <code>0.25</code> or <code>$100</code>.",
+
   // ---- pay asset picker ----
   "pay.title": "<b>How do you want to pay?</b>",
   "pay.subtitle": "You're buying: {product}",

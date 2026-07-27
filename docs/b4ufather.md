@@ -99,6 +99,17 @@ ADMIN_USER_IDS=          # fleet operators
 SUPPORT_HANDLE=          # default support contact for tenants that set none
 ```
 
+## Swap mode
+
+Tenants choose a **type** in the wizard: 🛍 Shop, 🔄 Swap, or both (`tenants.mode`).
+A swap bot is a whitelabel exchange: receive coin → payout address (+ memo on
+memo-bearing chains) → pay coin → amount ("0.1" in the pay coin or "$100") →
+live quote → deposit. It reuses the shop's pay picker, quote, deposit and
+poller surfaces wholesale; the destination is a synthesized crypto "leaf"
+instead of a product. Swap-only bots open straight into the receive picker —
+the bot IS the exchange. @SwapFatherBot (env `SWAPFATHER_BOT_TOKEN`) is a brand
+alias of the same factory with the wizard preset to swap mode.
+
 ## Explicitly out of scope (v1)
 
 - Tenant-set markup/fees — splits are org policy, not tenant config.

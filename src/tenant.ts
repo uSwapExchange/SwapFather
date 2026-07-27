@@ -4,8 +4,12 @@
  * the tenants table and are managed by @B4UFatherBot.
  */
 
+export type TenantMode = "shop" | "swap" | "both";
+
 export interface Tenant {
   id: number;
+  /** What the bot offers: digital products, crypto swaps, or both. */
+  mode: TenantMode;
   botId: number;
   botUsername: string;
   /** Plaintext token (decrypted at load; encrypted at rest for fleet rows). */
@@ -27,6 +31,14 @@ export function isNiche(tenant: Tenant): boolean {
   return tenant.families?.length === 1;
 }
 
+export function sellsProducts(tenant: Tenant): boolean {
+  return tenant.mode !== "swap";
+}
+
+export function sellsSwaps(tenant: Tenant): boolean {
+  return tenant.mode !== "shop";
+}
+
 export function defaultSupportHandle(): string {
   return process.env.SUPPORT_HANDLE ?? "@uSwapSupport";
 }
@@ -35,6 +47,7 @@ export function defaultSupportHandle(): string {
 export function flagshipTenant(botId: number, botUsername: string, botToken: string): Tenant {
   return {
     id: 0,
+    mode: (process.env.BOT_MODE as TenantMode) || "shop",
     botId,
     botUsername,
     botToken,

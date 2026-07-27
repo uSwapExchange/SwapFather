@@ -63,9 +63,15 @@ export interface Draft {
   leaf: LeafItem;
   /** Human-readable product label, e.g. "Adidas Gift Card" */
   productLabel: string;
-  /** Destination-side amount in human units (e.g. "50" stars, "25" USD). */
+  /** True for crypto→crypto swaps (leaf is a synthesized crypto asset). */
+  swap?: boolean;
+  /** Amount in human units. Products: destination-side. Swaps: source-side. */
   amountHuman?: string;
+  /** Swap amount semantics: which side + units the user typed. */
+  inputSide?: "from" | "to";
+  inputType?: "human" | "usd";
   destination?: string;
+  destinationMemo?: string;
   /** Chosen payment rail. */
   payAssetV1?: string;
   paySymbol?: string;
@@ -83,11 +89,22 @@ export interface Session {
   page?: PageItem[];
   draft?: Draft;
   /** What free-text input we're waiting for, if any. */
-  awaiting?: "amount" | "dest" | "search" | null;
+  awaiting?:
+    | "amount"
+    | "dest"
+    | "search"
+    | "swaddr"
+    | "swmemo"
+    | "swamount"
+    | null;
   /** Payment picker state. */
   payChoices?: PayAssetChoice[];
   payMore?: boolean;
   payNetChoice?: PayAssetChoice;
+  /** Swap receive-side picker state. */
+  swapChoices?: PayAssetChoice[];
+  swapMore?: boolean;
+  swapNetChoice?: PayAssetChoice;
 }
 
 export function loadSession(tenantId: number, userId: number): Session {

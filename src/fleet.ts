@@ -58,6 +58,22 @@ const father = new Bot(fatherToken);
 registerFather(father, fleet);
 father.catch((err) => logger.error("father bot error", { err: String(err.error) }));
 
+// Optional brand alias: @SwapFatherBot — same wizard, preset to swap mode.
+const swapFatherToken = process.env.SWAPFATHER_BOT_TOKEN;
+if (swapFatherToken) {
+  const swapFather = new Bot(swapFatherToken);
+  registerFather(swapFather, fleet, { presetMode: "swap" });
+  swapFather.catch((err) =>
+    logger.error("swapfather bot error", { err: String(err.error) }),
+  );
+  void swapFather
+    .start({
+      allowed_updates: ["message", "callback_query"],
+      onStart: () => logger.info("swapfather bot polling"),
+    })
+    .catch((err) => logger.error("swapfather polling died", { err: String(err) }));
+}
+
 // One poller serves the whole fleet.
 startPoller((tenantId) =>
   tenantId === 0 ? (flagship?.api ?? undefined) : fleet.apiFor(tenantId),

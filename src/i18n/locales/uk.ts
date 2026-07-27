@@ -130,4 +130,12 @@ export const uk: Partial<Locale> = {
   "amount.rangeCount": "Скільки? ({min}–{max})",
   "deposit.lockNote": "🕒 Ціну зафіксовано — краще надіслати протягом 5 хвилин ({time}). Пізніші платежі пройдуть за ринковим курсом.",
   "btn.clearSearch": "✖️ Скинути",
+  "btn.swap": "🔄 Обміняти крипту",
+  "swap.toTitle": "<b>Що хочете отримати?</b>",
+  "swap.toSubtitle": "Міняйте будь-яку монету на будь-яку — без акаунта.",
+  "swap.addrPrompt": "Надішліть адресу <b>{symbol}</b> ({network}), на яку прийде обмін:",
+  "swap.memoPrompt": "Чи потрібен для цієї адреси <b>memo/tag</b>? Надішліть його або пропустіть.",
+  "swap.amountPrompt": "Скільки міняємо? Надішліть суму в <b>{symbol}</b> (напр. <code>0.1</code>) або в доларах (напр. <code>$100</code>):",
+  "swap.youreceive": "Ви отримаєте (орієнтовно)",
+  "swap.invalidAmount": "Надішліть число, наприклад <code>0.25</code> або <code>$100</code>.",
 };

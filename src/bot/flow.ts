@@ -57,6 +57,11 @@ async function referralTokenFor(tenant: Tenant): Promise<string | undefined> {
 
 export type ScreenId =
   | "home"
+  | "swto"
+  | "swtonet"
+  | "swaddr"
+  | "swmemo"
+  | "swamount"
   | "browse"
   | "amount"
   | "dest"
@@ -350,6 +355,97 @@ export function normalizeDestination(s: FlowSession, input: string): string {
   return value;
 }
 
+// ---------- swap flow ----------
+
+/** Chains whose deposits/deliveries can require a memo or tag. */
+export const MEMO_CHAINS = new Set(["xrp", "stellar", "ton", "eos"]);
+
+async function loadCryptoChoices(counterpart?: string): Promise<PayAssetChoice[]> {
+  const res = await uswap.assets({
+    side: "to",
+    ...(counterpart ? { counterpart_asset_v1: counterpart } : {}),
+  });
+  return res.items
+    .filter((a) => a.category === "Crypto")
+    .map((a) => ({
+      assetId: a.asset_id,
+      symbol: a.symbol,
+      name: a.name,
+      networks: a.networks.map((n) => ({
+        asset_v1: n.asset_v1,
+        chain_id: n.chain_id,
+        chain_name: n.chain_name,
+        decimals: n.decimals,
+      })),
+    }));
+}
+
+export async function startSwap(s: FlowSession): Promise<void> {
+  s.draft = undefined;
+  s.swapChoices = await loadCryptoChoices();
+  s.swapMore = false;
+  s.screen = "swto";
+}
+
+export function pickSwapTo(s: FlowSession, idx: number): ScreenId {
+  const choice = s.swapChoices?.[idx];
+  if (!choice) return s.screen ?? "swto";
+  if (choice.networks.length > 1) {
+    s.swapNetChoice = choice;
+    s.screen = "swtonet";
+    return s.screen;
+  }
+  return selectSwapToNetwork(s, choice, 0);
+}
+
+export function selectSwapToNetwork(
+  s: FlowSession,
+  choice: PayAssetChoice,
+  netIdx: number,
+): ScreenId {
+  const net = choice.networks[netIdx];
+  if (!net) return s.screen ?? "swto";
+  // A swap destination is a synthesized "leaf": the receive asset itself.
+  s.draft = {
+    swap: true,
+    leaf: {
+      asset_v1: net.asset_v1,
+      symbol: choice.symbol,
+      name: choice.name,
+      decimals: net.decimals,
+      chain: {
+        id: net.chain_id,
+        name: net.chain_name,
+        unit_label: choice.symbol,
+        address_type: "crypto",
+        destination_required: true,
+      },
+    },
+    productLabel: `${choice.symbol} (${net.chain_name})`,
+    inputSide: "from",
+  };
+  s.screen = "swaddr";
+  return s.screen;
+}
+
+export function swapNeedsMemo(s: FlowSession): boolean {
+  return MEMO_CHAINS.has(s.draft?.leaf.chain.id ?? "");
+}
+
+/**
+ * Parse a swap amount: "$100" = USD notional, "0.1" = source-coin units.
+ * Returns null on garbage.
+ */
+export function parseSwapAmount(
+  input: string,
+): { amount: string; inputType: "human" | "usd" } | null {
+  const trimmed = input.trim();
+  const usd = trimmed.startsWith("$");
+  const body = (usd ? trimmed.slice(1) : trimmed).replace(/,/g, "").trim();
+  if (!/^\d+(\.\d+)?$/.test(body) || Number(body) <= 0) return null;
+  return { amount: body, inputType: usd ? "usd" : "human" };
+}
+
 // ---------- payment picker ----------
 
 export async function loadPayChoices(s: FlowSession): Promise<void> {
@@ -399,7 +495,9 @@ export function selectPayNetwork(
   draft.payChainId = net.chain_id;
   draft.payChainName = net.chain_name;
   draft.payDecimals = net.decimals;
-  s.screen = "quote";
+  // Products know their amount already; swaps ask for it after the pay coin
+  // (the amount is denominated in the coin being sent).
+  s.screen = draft.swap ? "swamount" : "quote";
   return s.screen;
 }
 
@@ -412,10 +510,11 @@ export async function fetchQuote(s: FlowSession, tenant: Tenant): Promise<QuoteR
     source_asset_v1: draft.payAssetV1!,
     destination_asset_v1: draft.leaf.asset_v1,
     ...(draft.destination ? { destination_address: draft.destination } : {}),
+    ...(draft.destinationMemo ? { destination_memo: draft.destinationMemo } : {}),
     ...(referralToken ? { referral_token: referralToken } : {}),
     amount: draft.amountHuman!,
-    input_side: "to",
-    input_type: "human",
+    input_side: draft.inputSide ?? "to",
+    input_type: draft.inputType ?? "human",
   });
   draft.quote = {
     draft_id: q.draft_id,
@@ -480,10 +579,11 @@ export async function commit(
           source_asset_v1: draft.payAssetV1!,
           destination_asset_v1: draft.leaf.asset_v1,
           ...(draft.destination ? { destination_address: draft.destination } : {}),
+          ...(draft.destinationMemo ? { destination_memo: draft.destinationMemo } : {}),
           ...(referralToken ? { referral_token: referralToken } : {}),
           amount: draft.amountHuman!,
-          input_side: "to",
-          input_type: "human",
+          input_side: draft.inputSide ?? "to",
+          input_type: draft.inputType ?? "human",
           draft_id: q.draft_id,
           plan_id: q.plan_id,
           leg_plan_ids: q.leg_plan_ids,

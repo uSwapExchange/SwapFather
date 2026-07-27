@@ -28,9 +28,11 @@ import { esc } from "../lib/format.ts";
 import { logger } from "../lib/logger.ts";
 import { setupBotProfile } from "../lib/telegram-profile.ts";
 import { rowToTenant, type Fleet } from "../fleet/manager.ts";
+import type { TenantMode } from "../tenant.ts";
 import { affiliateEarnings, AffiliateError, registerAffiliate } from "./affiliate.ts";
 
 interface FDraft {
+  mode?: TenantMode;
   botToken: string;
   botId: number;
   botUsername: string;
@@ -75,7 +77,12 @@ const admins = (process.env.ADMIN_USER_IDS ?? "")
   .map((s) => Number(s.trim()))
   .filter(Boolean);
 
-export function registerFather(bot: Bot, fleet: Fleet) {
+export interface FatherOptions {
+  /** Preset tenant mode (e.g. @SwapFatherBot always mints swap bots). */
+  presetMode?: TenantMode;
+}
+
+export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {}) {
   const run = async (ctx: Context, fn: (f: Fctx) => Promise<void>) => {
     if (!ctx.from || !ctx.chat || ctx.chat.type !== "private") return;
     const s = getFatherSession<FSession>(ctx.from.id) ?? {};
@@ -141,7 +148,7 @@ export function registerFather(bot: Bot, fleet: Fleet) {
           f.s.draft.brand = text.slice(0, 48);
           f.s.awaiting = null;
           await deleteMsg(ctx);
-          return showCategories(f);
+          return showModeStep(f);
         }
         case "support": {
           if (!f.s.draft) return;
@@ -244,6 +251,12 @@ export function registerFather(bot: Bot, fleet: Fleet) {
           if (!f.s.draft) return;
           f.s.draft.brand = f.s.draft.botName.slice(0, 48);
           f.s.awaiting = null;
+          return showModeStep(f);
+        }
+        case "mo": {
+          if (!f.s.draft) return;
+          f.s.draft.mode = a as TenantMode;
+          if (a === "swap") return askSupport(f);
           return showCategories(f);
         }
         case "g": {
@@ -271,11 +284,7 @@ export function registerFather(bot: Bot, fleet: Fleet) {
               .answerCallbackQuery({ text: "Pick at least one category", show_alert: true })
               .catch(() => {}) as Promise<void>;
           }
-          f.s.awaiting = "support";
-          return show(f, {
-            text: "💬 <b>Support contact</b>\n\nSend the @username your buyers should contact for help, or skip to use uSwap support.",
-            keyboard: [[btn("⏭ Skip", "ss")]],
-          });
+          return askSupport(f);
         }
         case "ss":
           if (f.s.draft) f.s.draft.support = null;
@@ -476,6 +485,36 @@ export function registerFather(bot: Bot, fleet: Fleet) {
     });
   }
 
+  async function showModeStep(f: Fctx) {
+    if (opts.presetMode) {
+      f.s.draft!.mode = opts.presetMode;
+      if (opts.presetMode === "swap") return askSupport(f);
+      return showCategories(f);
+    }
+    return show(f, {
+      text: [
+        "🧭 <b>Step 3 — what kind of bot?</b>",
+        "",
+        "🛍 <b>Shop</b> — sell digital products (gift cards, Stars, Nitro, VPN…)",
+        "🔄 <b>Swap</b> — a crypto exchange bot: any coin → any coin",
+        "Or both in one bot.",
+      ].join("\n"),
+      keyboard: [
+        [btn("🛍 Shop", "mo:shop"), btn("🔄 Swap", "mo:swap")],
+        [btn("🛍 + 🔄 Both", "mo:both", "primary")],
+        [btn("‹ Cancel", "h", "danger")],
+      ],
+    });
+  }
+
+  async function askSupport(f: Fctx) {
+    f.s.awaiting = "support";
+    return show(f, {
+      text: "💬 <b>Support contact</b>\n\nSend the @username your buyers should contact for help, or skip to use uSwap support.",
+      keyboard: [[btn("⏭ Skip", "ss")]],
+    });
+  }
+
   async function showCategories(f: Fctx) {
     const d = f.s.draft!;
     const families = await getFamilies();
@@ -511,12 +550,15 @@ export function registerFather(bot: Bot, fleet: Fleet) {
           .filter((x) => d.families!.includes(x.id))
           .map((x) => x.name)
           .join(", ");
+    const mode = d.mode ?? "shop";
+    const modeLabel = mode === "shop" ? "🛍 Shop" : mode === "swap" ? "🔄 Swap" : "🛍 Shop + 🔄 Swap";
     const lines = [
       "🚀 <b>Ready to launch</b>",
       "",
       `Bot: @${esc(d.botUsername)}`,
       `Brand: <b>${esc(d.brand ?? d.botName)}</b>`,
-      `Catalog: ${esc(cats)}`,
+      `Type: ${modeLabel}`,
+      ...(mode === "swap" ? [] : [`Catalog: ${esc(cats)}`]),
       `Support: ${esc(d.support ?? "uSwap support")}`,
       `Payouts: ${d.registered ? `✅ code <code>${esc(d.code ?? "")}</code>` : "not set up — you can add them later"}`,
     ];
@@ -556,6 +598,7 @@ export function registerFather(bot: Bot, fleet: Fleet) {
     const d = f.s.draft;
     if (!d) return show(f, home());
     const tenantId = insertTenant({
+      mode: d.mode ?? "shop",
       botId: d.botId,
       botUsername: d.botUsername,
       botTokenEnc: encryptSecret(d.botToken),
@@ -615,11 +658,13 @@ export function registerFather(bot: Bot, fleet: Fleet) {
     if (!row) return showMyBots(f);
     const families = row.families ? (JSON.parse(row.families) as string[]) : null;
     const orders = countTenantOrders(id);
+    const mode = (row.mode as TenantMode) || "shop";
     const lines = [
       `<b>@${esc(row.bot_username)}</b> — ${esc(row.brand_name)}`,
       "",
       `Status: ${row.status === "active" ? "🟢 live" : "⏸ paused"}`,
-      `Catalog: ${families ? esc(families.join(", ")) : "Everything"}`,
+      `Type: ${mode === "shop" ? "🛍 Shop" : mode === "swap" ? "🔄 Swap" : "🛍 + 🔄 Both"}`,
+      ...(mode === "swap" ? [] : [`Catalog: ${families ? esc(families.join(", ")) : "Everything"}`]),
       `Support: ${esc(row.support_handle ?? "uSwap support")}`,
       `Payouts: ${row.creator_code ? `✅ <code>${esc(row.creator_code)}</code>` : "not set up"}`,
       `Orders: ${orders.total} (${orders.completed} delivered)`,

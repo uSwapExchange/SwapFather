@@ -47,7 +47,12 @@ function navRow(t: Translator, opts: { back?: boolean; home?: boolean } = {}): B
 
 // ---------- home ----------
 
-export function renderHome(t: Translator, families: Family[], brand: string): Screen {
+export function renderHome(
+  t: Translator,
+  families: Family[],
+  brand: string,
+  withSwap = false,
+): Screen {
   const text = [
     t("home.title", { brand: esc(brand) }),
     "",
@@ -64,6 +69,7 @@ export function renderHome(t: Translator, families: Family[], brand: string): Sc
   const keyboard: Keyboard = [
     ...(familyBtns.length ? [[familyBtns[0]!]] : []),
     ...grid(familyBtns.slice(1), 2),
+    ...(withSwap ? [[btn(t("btn.swap"), "sw")]] : []),
     [btn(t("btn.orders"), "or"), btn(t("btn.language"), "lg")],
     [btn(t("btn.help"), "hp")],
   ];
@@ -204,6 +210,76 @@ export function renderDest(
   return { text: lines.join("\n"), keyboard };
 }
 
+// ---------- swap ----------
+
+export function renderSwapTo(
+  t: Translator,
+  choices: PayAssetChoice[],
+  more: boolean,
+): Screen {
+  const lines = [t("swap.toTitle"), "", t("swap.toSubtitle")];
+  let shown: PayAssetChoice[];
+  if (!more) {
+    const popular = POPULAR_ORDER.map((id) =>
+      choices.find((c) => c.assetId.toLowerCase() === id),
+    ).filter((c): c is PayAssetChoice => Boolean(c));
+    shown = popular.length >= 4 ? popular : choices.slice(0, 12);
+  } else {
+    shown = choices;
+  }
+  const assetBtns = shown.map((c) => {
+    const idx = choices.indexOf(c);
+    const icon = assetIconId(c.assetId);
+    const label = icon ? c.symbol : `${assetEmojiChar(c.assetId)} ${c.symbol}`;
+    return btn(label, `st:${idx}`, undefined, icon);
+  });
+  const keyboard: Keyboard = [...grid(assetBtns, 3)];
+  if (!more && choices.length > shown.length) {
+    keyboard.push([btn(t("pay.morecoins"), "st:m")]);
+  }
+  keyboard.push(navRow(t));
+  return { text: lines.join("\n"), keyboard };
+}
+
+export function renderSwapToNetworks(t: Translator, choice: PayAssetChoice): Screen {
+  const lines = [
+    t("pay.networkTitle", { symbol: esc(choice.symbol) }),
+    "",
+    t("pay.networkSubtitle"),
+  ];
+  const netBtns = choice.networks.map((n, i) =>
+    btn(n.chain_name, `sn:${i}`, undefined, networkIconId(n.chain_id)),
+  );
+  return { text: lines.join("\n"), keyboard: [...grid(netBtns, 2), navRow(t)] };
+}
+
+export function renderSwapAddr(t: Translator, draft: Draft): Screen {
+  return {
+    text: t("swap.addrPrompt", {
+      symbol: esc(draft.leaf.symbol),
+      network: esc(draft.leaf.chain.name),
+    }),
+    keyboard: [navRow(t)],
+  };
+}
+
+export function renderSwapMemo(t: Translator): Screen {
+  return {
+    text: t("swap.memoPrompt"),
+    keyboard: [[btn(t("dest.skip"), "sm")], navRow(t)],
+  };
+}
+
+const SWAP_USD_PRESETS = [20, 50, 100, 250, 500, 1000];
+
+export function renderSwapAmount(t: Translator, draft: Draft): Screen {
+  const presets = SWAP_USD_PRESETS.map((n) => btn(`$${n}`, `sa:${n}`));
+  return {
+    text: t("swap.amountPrompt", { symbol: esc(draft.paySymbol ?? "") }),
+    keyboard: [...grid(presets, 3), navRow(t)],
+  };
+}
+
 // ---------- payment asset picker ----------
 
 const POPULAR_ORDER = [
@@ -262,6 +338,7 @@ function familyOf(draft: Draft): string {
 }
 
 function summaryLine(draft: Draft): string {
+  if (draft.swap) return `🔄 <b>${esc(draft.productLabel)}</b>`;
   return `${productEmoji(familyOf(draft))} <b>${esc(formatProductAmount(draft))}</b>`;
 }
 
@@ -292,12 +369,19 @@ export function renderQuote(t: Translator, draft: Draft): Screen {
       ? `@${draft.destination}`
       : draft.destination
     : null;
+  // Swaps: "you get" is the ESTIMATED receive amount from the live quote.
+  const getLine = draft.swap
+    ? `${t("swap.youreceive")}:  <b>~${niceCrypto(rawToHuman(q.destination_amount_raw, draft.leaf.decimals))} ${esc(draft.leaf.symbol)}</b> <i>(≈ ${usd(q.destination_amount_usd)})</i>`
+    : `${t("quote.youget")}:  ${summaryLine(draft)}`;
   const lines = [
     t("quote.title"),
     "",
-    `${t("quote.youget")}:  ${summaryLine(draft)}`,
+    getLine,
     `${t("quote.yousend")}:  <b>${sourceHuman} ${esc(paySymbol)}</b> <i>(≈ ${usd(q.source_amount_usd)})</i> ${t("quote.via", { network: esc(draft.payChainName ?? "") })}`,
     ...(destDisplay ? [`${t("quote.deliverto")}:  <code>${esc(destDisplay)}</code>`] : []),
+    ...(draft.destinationMemo
+      ? [`Memo:  <code>${esc(draft.destinationMemo)}</code>`]
+      : []),
     "",
     `${t("quote.eta")}: ${t("quote.etaValue", { minutes: 5 })}`,
     `⏳ ${tgTime(q.expires_at)}`,

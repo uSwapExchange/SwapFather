@@ -130,4 +130,12 @@ export const zh: Partial<Locale> = {
   "amount.rangeCount": "购买数量？（{min}–{max}）",
   "deposit.lockNote": "🕒 价格已锁定——最好在 5 分钟内（{time}）付款。之后的付款将按实时市场价完成。",
   "btn.clearSearch": "✖️ 清除",
+  "btn.swap": "🔄 兑换加密货币",
+  "swap.toTitle": "<b>你想收到什么币？</b>",
+  "swap.toSubtitle": "任意币换任意币——无需账户。",
+  "swap.addrPrompt": "发送接收兑换的 <b>{symbol}</b> 地址（{network}）：",
+  "swap.memoPrompt": "该地址需要 <b>memo/tag</b> 吗？现在发送，或跳过。",
+  "swap.amountPrompt": "要兑换多少？发送 <b>{symbol}</b> 数量（如 <code>0.1</code>）或美元金额（如 <code>$100</code>）：",
+  "swap.youreceive": "预计收到",
+  "swap.invalidAmount": "请发送数字，如 <code>0.25</code> 或 <code>$100</code>。",
 };

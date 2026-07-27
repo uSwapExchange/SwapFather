@@ -39,7 +39,7 @@ import { uswap, UswapApiError } from "../uswap/client.ts";
 import { esc, rawToHuman } from "../lib/format.ts";
 import { logger } from "../lib/logger.ts";
 import { checkOrderNow } from "./poller.ts";
-import { isNiche, type Tenant } from "../tenant.ts";
+import { isNiche, sellsProducts, sellsSwaps, type Tenant } from "../tenant.ts";
 
 interface Uctx {
   ctx: Context;
@@ -119,13 +119,18 @@ function isCustomEmojiRejection(msg: string): boolean {
 }
 
 async function showHome(u: Uctx, opts: { newMessage?: boolean } = {}): Promise<void> {
-  const families = await getFamilies(u.tenant.families);
   u.s.nav = [];
   u.s.draft = undefined;
   u.s.awaiting = null;
+  // A swap-only bot IS a swap service — home is the receive-coin picker.
+  if (!sellsProducts(u.tenant)) {
+    await flow.startSwap(u.s);
+    return showCurrent(u);
+  }
+  const families = await getFamilies(u.tenant.families);
   // Niche mode: a single-category bot IS that category — home opens the
   // category itself, no pointless one-button shop grid in between.
-  if (isNiche(u.tenant) && families.length === 1) {
+  if (isNiche(u.tenant) && families.length === 1 && !sellsSwaps(u.tenant)) {
     await flow.enterLevel(u.s, {
       asset: families[0]!.id,
       segments: [],
@@ -136,7 +141,11 @@ async function showHome(u: Uctx, opts: { newMessage?: boolean } = {}): Promise<v
     return showBrowse(u);
   }
   u.s.screen = "home";
-  await showScreen(u, screens.renderHome(u.t, families, u.tenant.brandName), opts);
+  await showScreen(
+    u,
+    screens.renderHome(u.t, families, u.tenant.brandName, sellsSwaps(u.tenant)),
+    opts,
+  );
 }
 
 async function showBrowse(u: Uctx): Promise<void> {
@@ -150,6 +159,22 @@ async function showCurrent(u: Uctx): Promise<void> {
   switch (s.screen) {
     case "browse":
       return showBrowse(u);
+    case "swto":
+      return showScreen(
+        u,
+        screens.renderSwapTo(u.t, s.swapChoices ?? [], s.swapMore ?? false),
+      );
+    case "swtonet":
+      return showScreen(u, screens.renderSwapToNetworks(u.t, s.swapNetChoice!));
+    case "swaddr":
+      s.awaiting = "swaddr";
+      return showScreen(u, screens.renderSwapAddr(u.t, s.draft!));
+    case "swmemo":
+      s.awaiting = "swmemo";
+      return showScreen(u, screens.renderSwapMemo(u.t));
+    case "swamount":
+      s.awaiting = "swamount";
+      return showScreen(u, screens.renderSwapAmount(u.t, s.draft!));
     case "amount":
       // Arm free-text input: presets are one tap, but typing "75" works too.
       s.awaiting = "amount";
@@ -237,7 +262,9 @@ async function confirmAndOpen(u: Uctx) {
     return showQuoteError(u, err);
   }
 
-  const productLabel = screens.formatProductAmount(draft);
+  const productLabel = draft.swap
+    ? `Swap → ~${rawToHuman(draft.quote!.destination_amount_raw, draft.leaf.decimals)} ${draft.leaf.symbol}`
+    : screens.formatProductAmount(draft);
 
   const orderId = insertOrder({
     tenantId: u.tenant.id,
@@ -325,6 +352,21 @@ async function showOrderDetail(u: Uctx, orderId: number) {
 async function goBack(u: Uctx) {
   const s = u.s;
   switch (s.screen) {
+    case "swto":
+      s.draft = undefined;
+      return showHome(u);
+    case "swtonet":
+      s.screen = "swto";
+      return showCurrent(u);
+    case "swaddr":
+      s.screen = s.swapNetChoice && s.swapNetChoice.networks.length > 1 ? "swtonet" : "swto";
+      return showCurrent(u);
+    case "swmemo":
+      s.screen = "swaddr";
+      return showCurrent(u);
+    case "swamount":
+      s.screen = "pay";
+      return showCurrent(u);
     case "browse": {
       s.nav.pop();
       const nav = flow.currentNav(s);
@@ -341,6 +383,10 @@ async function goBack(u: Uctx) {
       return showCurrent(u);
     case "pay": {
       const draft = s.draft;
+      if (draft?.swap) {
+        s.screen = flow.swapNeedsMemo(s) ? "swmemo" : "swaddr";
+        return showCurrent(u);
+      }
       if (draft && (draft.destination || !draft.leaf.chain.address_prompt)) {
         s.screen = draft.leaf.chain.destination_locked
           ? "browse"
@@ -357,7 +403,7 @@ async function goBack(u: Uctx) {
       s.screen = "pay";
       return showCurrent(u);
     case "quote":
-      s.screen = "pay";
+      s.screen = s.draft?.swap ? "swamount" : "pay";
       return showCurrent(u);
     default:
       return showHome(u);
@@ -678,6 +724,40 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
         flow.selectPayNetwork(s, s.payNetChoice, Number(arg));
         return showCurrent(u);
       }
+      case "sw": {
+        await flow.startSwap(s);
+        return showCurrent(u);
+      }
+      case "st": {
+        if (arg === "m") {
+          s.swapMore = true;
+          return showCurrent(u);
+        }
+        flow.pickSwapTo(s, Number(arg));
+        return showCurrent(u);
+      }
+      case "sn": {
+        if (!s.swapNetChoice) return showCurrent(u);
+        flow.selectSwapToNetwork(s, s.swapNetChoice, Number(arg));
+        return showCurrent(u);
+      }
+      case "sm": {
+        s.awaiting = null;
+        s.draft!.destinationMemo = undefined;
+        s.screen = "pay";
+        await flow.loadPayChoices(s);
+        return showCurrent(u);
+      }
+      case "sa": {
+        const draft = s.draft;
+        if (!draft?.swap) return showCurrent(u);
+        s.awaiting = null;
+        draft.amountHuman = arg;
+        draft.inputType = "usd";
+        draft.inputSide = "from";
+        s.screen = "quote";
+        return showCurrent(u);
+      }
       case "cf":
         // Double-tap guard: the first tap clears the draft when it finishes,
         // so a queued second tap must not re-enter with empty state.
@@ -780,6 +860,46 @@ function makeHandleText(runUi: RunUi) {
         s.screen = "pay";
         await deleteUserMessage(ctx);
         await flow.loadPayChoices(s);
+        return showCurrent(u);
+      }
+      case "swaddr": {
+        const value = text.trim();
+        if (value.length < 8 || value.length > 128) {
+          await ctx.reply(u.t("dest.invalid"));
+          return;
+        }
+        s.awaiting = null;
+        s.draft!.destination = value;
+        await deleteUserMessage(ctx);
+        if (flow.swapNeedsMemo(s)) {
+          s.screen = "swmemo";
+          return showCurrent(u);
+        }
+        s.screen = "pay";
+        await flow.loadPayChoices(s);
+        return showCurrent(u);
+      }
+      case "swmemo": {
+        s.awaiting = null;
+        s.draft!.destinationMemo = text.trim().slice(0, 32) || undefined;
+        await deleteUserMessage(ctx);
+        s.screen = "pay";
+        await flow.loadPayChoices(s);
+        return showCurrent(u);
+      }
+      case "swamount": {
+        const parsed = flow.parseSwapAmount(text);
+        if (!parsed) {
+          await ctx.reply(u.t("swap.invalidAmount"), { parse_mode: "HTML" });
+          return;
+        }
+        s.awaiting = null;
+        const draft = s.draft!;
+        draft.amountHuman = parsed.amount;
+        draft.inputType = parsed.inputType;
+        draft.inputSide = "from";
+        await deleteUserMessage(ctx);
+        s.screen = "quote";
         return showCurrent(u);
       }
       case "search": {

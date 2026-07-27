@@ -130,4 +130,12 @@ export const hi: Partial<Locale> = {
   "amount.rangeCount": "कितने? ({min}–{max})",
   "deposit.lockNote": "🕒 कीमत लॉक है — 5 मिनट के भीतर ({time}) भेजना बेहतर है। बाद के भुगतान लाइव मार्केट रेट पर पूरे होंगे।",
   "btn.clearSearch": "✖️ हटाएँ",
+  "btn.swap": "🔄 क्रिप्टो स्वैप करें",
+  "swap.toTitle": "<b>आप क्या पाना चाहते हैं?</b>",
+  "swap.toSubtitle": "कोई भी कॉइन किसी भी कॉइन से बदलें — बिना अकाउंट के।",
+  "swap.addrPrompt": "वह <b>{symbol}</b> पता ({network}) भेजें जिस पर आपका स्वैप आएगा:",
+  "swap.memoPrompt": "क्या इस पते के लिए <b>memo/tag</b> चाहिए? अभी भेजें, या छोड़ें।",
+  "swap.amountPrompt": "कितना स्वैप करना है? <b>{symbol}</b> में राशि भेजें (जैसे <code>0.1</code>) या डॉलर में (जैसे <code>$100</code>):",
+  "swap.youreceive": "आपको मिलेगा (अनुमानित)",
+  "swap.invalidAmount": "कोई संख्या भेजें, जैसे <code>0.25</code> या <code>$100</code>।",
 };

@@ -16,6 +16,7 @@ import type { TenantRow } from "../lib/store.ts";
 export function rowToTenant(row: TenantRow): Tenant {
   return {
     id: row.id,
+    mode: (row.mode as Tenant["mode"]) || "shop",
     botId: row.bot_id,
     botUsername: row.bot_username,
     botToken: decryptSecret(row.bot_token_enc),

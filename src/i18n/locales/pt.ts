@@ -130,4 +130,12 @@ export const pt: Partial<Locale> = {
   "amount.rangeCount": "Quantos? ({min}–{max})",
   "deposit.lockNote": "🕒 Preço travado — envie em até 5 minutos ({time}). Pagamentos depois disso saem pelo preço de mercado.",
   "btn.clearSearch": "✖️ Limpar",
+  "btn.swap": "🔄 Trocar cripto",
+  "swap.toTitle": "<b>O que você quer receber?</b>",
+  "swap.toSubtitle": "Troque qualquer moeda por outra — sem conta.",
+  "swap.addrPrompt": "Envie o endereço de <b>{symbol}</b> ({network}) que vai receber sua troca:",
+  "swap.memoPrompt": "Esse endereço precisa de <b>memo/tag</b>? Envie agora, ou pule.",
+  "swap.amountPrompt": "Quanto você quer trocar? Envie um valor em <b>{symbol}</b> (ex. <code>0.1</code>) ou em dólares (ex. <code>$100</code>):",
+  "swap.youreceive": "Você recebe (estimado)",
+  "swap.invalidAmount": "Envie um número como <code>0.25</code> ou <code>$100</code>.",
 };

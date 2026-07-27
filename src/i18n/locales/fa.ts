@@ -130,4 +130,12 @@ export const fa: Partial<Locale> = {
   "amount.rangeCount": "چند عدد؟ ({min}–{max})",
   "deposit.lockNote": "🕒 قیمت قفل شد — بهتر است ظرف ۵ دقیقه ({time}) پرداخت کنید. پرداخت‌های دیرتر با نرخ لحظه‌ای بازار انجام می‌شوند.",
   "btn.clearSearch": "✖️ حذف",
+  "btn.swap": "🔄 تبدیل ارز دیجیتال",
+  "swap.toTitle": "<b>می‌خواهید چه چیزی دریافت کنید؟</b>",
+  "swap.toSubtitle": "هر کوینی را با هر کوین دیگر تبدیل کنید — بدون حساب.",
+  "swap.addrPrompt": "آدرس <b>{symbol}</b> ({network}) که تبدیل به آن واریز می‌شود را بفرستید:",
+  "swap.memoPrompt": "آیا این آدرس <b>memo/tag</b> لازم دارد؟ الان بفرستید یا رد شوید.",
+  "swap.amountPrompt": "چقدر تبدیل می‌کنید؟ مقدار را به <b>{symbol}</b> (مثل <code>0.1</code>) یا دلار (مثل <code>$100</code>) بفرستید:",
+  "swap.youreceive": "دریافتی شما (تقریبی)",
+  "swap.invalidAmount": "یک عدد بفرستید، مثل <code>0.25</code> یا <code>$100</code>.",
 };

@@ -66,6 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_user ON orders (tenant_id, user_id, id DES
 
 CREATE TABLE IF NOT EXISTS tenants (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mode TEXT NOT NULL DEFAULT 'shop',
   bot_id INTEGER NOT NULL UNIQUE,
   bot_username TEXT NOT NULL,
   bot_token_enc TEXT NOT NULL,
@@ -87,6 +88,13 @@ CREATE TABLE IF NOT EXISTS father_sessions (
   updated_at TEXT NOT NULL
 );
 `);
+
+// Older fleet DBs predate the mode column.
+try {
+  db.exec("ALTER TABLE tenants ADD COLUMN mode TEXT NOT NULL DEFAULT 'shop'");
+} catch {
+  // column already exists
+}
 
 export interface UserRow {
   tenant_id: number;
@@ -300,6 +308,7 @@ export function countTenantOrders(tenantId: number): { total: number; completed:
 
 export interface TenantRow {
   id: number;
+  mode: string;
   bot_id: number;
   bot_username: string;
   bot_token_enc: string;
@@ -314,6 +323,7 @@ export interface TenantRow {
 }
 
 export function insertTenant(t: {
+  mode: string;
   botId: number;
   botUsername: string;
   botTokenEnc: string;
@@ -325,11 +335,14 @@ export function insertTenant(t: {
   affiliateTokenEnc: string | null;
 }): number {
   const now = new Date().toISOString();
+  // A previously removed enrollment of the same bot gives way to the new one
+  // (bot_id is UNIQUE).
+  db.query("DELETE FROM tenants WHERE bot_id = ?1 AND status = 'deleted'").run(t.botId);
   const res = db
     .query(
-      `INSERT INTO tenants (bot_id, bot_username, bot_token_enc, owner_user_id, brand_name,
+      `INSERT INTO tenants (mode, bot_id, bot_username, bot_token_enc, owner_user_id, brand_name,
         support_handle, families, creator_code, affiliate_token_enc, status, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'active', ?10, ?10)`,
+       VALUES (?11, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'active', ?10, ?10)`,
     )
     .run(
       t.botId,
@@ -342,6 +355,7 @@ export function insertTenant(t: {
       t.creatorCode,
       t.affiliateTokenEnc,
       now,
+      t.mode,
     );
   return Number(res.lastInsertRowid);
 }
@@ -351,8 +365,11 @@ export function getTenantRow(id: number): TenantRow | null {
 }
 
 export function getTenantByBotId(botId: number): TenantRow | null {
+  // Deleted tenants don't count as enrolled — the bot can be re-minted.
   return db
-    .query<TenantRow, [number]>("SELECT * FROM tenants WHERE bot_id = ?1")
+    .query<TenantRow, [number]>(
+      "SELECT * FROM tenants WHERE bot_id = ?1 AND status != 'deleted'",
+    )
     .get(botId);
 }
 
