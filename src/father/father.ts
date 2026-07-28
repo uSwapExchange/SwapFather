@@ -518,10 +518,38 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           const tenant = rowToTenant(row);
           try {
             const e = await affiliateEarnings(tenant.affiliateToken!);
-            const summary = JSON.stringify(e.summary ?? e, null, 0).slice(0, 800);
+            const sum = (e.summary ?? e) as Record<string, unknown>;
+            const money = (v: unknown) => {
+              const n = Number(v ?? 0);
+              return Number.isFinite(n)
+                ? `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : "$0.00";
+            };
+            const lines = [
+              `💰 <b>Earnings — ${esc(row.brand_name)}</b>`,
+              `<i>Creator code: ${esc(row.creator_code ?? "")}</i>`,
+              "",
+              `Referred swaps:  <b>${Number(sum.referred_swaps ?? 0)}</b>`,
+              `Volume referred:  <b>${money(sum.referred_volume_usd)}</b>`,
+              "",
+              `Your earnings:  <b>${money(sum.affiliate_amount_usd)}</b>`,
+              `• Paid out:  ${money(sum.dispatched_amount_usd)}`,
+              `• Pending:  ${money(sum.accrued_amount_usd)}`,
+            ];
+            const failed = Number(sum.failed_amount_usd ?? 0);
+            if (failed > 0) lines.push(`• ⚠️ Failed payouts: ${money(failed)}`);
+            if (Number(sum.referred_swaps ?? 0) === 0) {
+              lines.push(
+                "",
+                `<i>Nothing yet — every sale through @${esc(row.bot_username)} counts once buyers arrive.</i>`,
+              );
+            }
             return show(f, {
-              text: `💰 <b>Earnings — ${esc(row.brand_name)}</b>\n\n<code>${esc(summary)}</code>`,
-              keyboard: [[btn("‹ Back", `t:${id}`)]],
+              text: lines.join("\n"),
+              keyboard: [
+                [btn("✏️ Payout wallets", `ps2:${id}`)],
+                [btn("‹ Back", `t:${id}`)],
+              ],
             });
           } catch (err) {
             const msg = err instanceof AffiliateError ? err.message : "fetch failed";
