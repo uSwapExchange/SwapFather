@@ -1,33 +1,30 @@
 # Best B4U
 
-A Telegram bot for buying digital products with crypto — gift cards, Telegram Stars & Premium, Discord Nitro, Mullvad VPN time, prepaid cards and more. Powered by the [uSwap Partner API](https://partner-api.uswap.net/v1/openapi.json).
+Telegram commerce on the [uSwap](https://uswap.net) engine.
 
-No accounts, no KYC, no card on file: pick a product, send one crypto payment, get your product delivered right in the chat.
+Run **a shop** (gift cards, Telegram Stars & Premium, Discord Nitro, Mullvad VPN, TF2 keys, prepaid cards), **a swap service** (any coin → any coin, 50+ currencies), or **both** — and optionally let anyone mint their own branded copy of it in under a minute.
 
-## How it feels
+No accounts, no KYC, no card on file: pick a product, send one crypto payment, get it delivered in the chat.
 
 ```
-🏠 Home            →  🎁 Gift Cards · ✈️ Telegram · 🎮 Discord · 💳 Prepaid · 🛡 Mullvad
-🛍 Browse          →  category pills, search, price/discount on every button
-⚙️ Configure       →  smart amount presets, "send to me" shortcuts
-💰 Pay             →  50+ coins, per-network deposit address + QR + one-tap copy
-📦 Delivered       →  live status updates, codes stored under 🧾 My orders forever
+🏠 Home         →  🎁 Gift Cards · ✈️ Telegram · 🎮 Discord · 💳 Prepaid · 🛡 Mullvad · 🔑 TF2 · 🔄 Swap
+🛍 Browse       →  category aisles with counts, search, price + discount on every button
+⚙️ Configure    →  smart amount presets, "send it to me" shortcuts, min-deposit hints
+💰 Pay          →  50+ coins, per-network deposit address, QR + one-tap copy
+📦 Delivered    →  live status in place, codes spoiler-wrapped, saved under 🧾 My orders
 ```
 
-Every screen is one anchored message edited in place — the chat never fills with menu spam. Buttons use Telegram's colored styles (green confirm, red cancel, blue selection) and uSwap's custom emoji packs when available.
+Every screen is one anchored message edited in place — the chat never fills with menu spam. Buttons use Telegram's colored styles and uSwap's custom emoji packs when the bot is entitled to them.
 
-## Features
+## Three ways to run it
 
-- **Full uSwap digital catalog, live** — the bot renders whatever `POST /v1/catalog/level` returns, so new brands/products appear without code changes (34+ US gift-card brands, Telegram Stars/Premium/Ads/+888 numbers, Discord Nitro/boosts/OG usernames, Mullvad, CakePay prepaid cards in 160+ countries).
-- **Pay with anything uSwap routes** — BTC, ETH, SOL, USDC/USDT (16 networks), XMR, LTC, TON and 50+ more.
-- **Price-locked quotes** with a live countdown; late payments still settle at market rate through uSwap's bridge policies.
-- **Order tracking** — background polling pushes payment-detected / converting / delivering / done straight into the deposit card; delivery codes are spoiler-wrapped and one-tap copyable.
-- **10 languages** out of the box (en, es, ru, zh, fr, de, pt, uk, fa, hi), auto-detected from Telegram, switchable with /language.
-- **Custom emoji + colored buttons** (Bot API 10.x) with automatic downgrade to plain unicode when the bot owner has no Telegram Premium.
-- **Deep links** — `t.me/YourBot?start=gift-card` opens the gift-card shelf; `?start=gc-amazon` jumps straight to a brand's amount screen.
-- **Inline mode** — type `@YourBot amazon` in any chat to share a product card with a buy-in-bot button (enable once via @BotFather `/setinline`; the bot degrades gracefully when it's off).
+| Mode | Command | What you get |
+|---|---|---|
+| **Shop / swap bot** | `bun run start` | One bot you own, configured by env (`BOT_MODE=shop\|swap\|both`) |
+| **Fleet** | `bun run fleet` | A factory bot (@SwapFather-style) that lets anyone mint their own branded bot, hosted by you |
+| **Docker** | `docker compose up` | The fleet in a container, SQLite on a named volume |
 
-## Quick start
+## Quick start (single bot)
 
 Requirements: [bun](https://bun.sh) ≥ 1.1.
 
@@ -37,97 +34,158 @@ cd best-b4u
 bun install
 
 cp .env.example .env
-# fill in TELEGRAM_BOT_TOKEN (from @BotFather) and USWAP_API_KEY
-# (partner.uswap.net → API Keys; scopes: catalog:read, bridges:read,
-#  bridges:write, intents:read, intents:write)
+#   TELEGRAM_BOT_TOKEN  — from @BotFather
+#   USWAP_API_KEY       — partner.uswap.net → API Keys
+#                         scopes: catalog:read, bridges:read, bridges:write,
+#                                 intents:read, intents:write
+#   BOT_MODE            — shop (default) | swap | both
 
 bun run setup:telegram   # one-shot: localized commands + descriptions
 bun run dev              # long-polling bot with hot reload
 ```
 
-State lives in a single SQLite file (`DATABASE_PATH`, default `./data/bestb4u.db`) — orders, sessions and language preferences survive restarts. No other infrastructure is needed; the bot is a pure API client.
+State lives in one SQLite file (`DATABASE_PATH`, default `./data/bestb4u.db`) — orders, sessions, language preferences, and (in fleet mode) tenants. No other infrastructure: the bot is a pure API client and needs no inbound ports.
+
+## Features
+
+- **The whole uSwap digital catalog, live.** Screens are rendered from `POST /v1/catalog/level`, so new brands and product families appear without code changes.
+- **Aisle-first browsing.** Big categories open as a chooser with counts (`🎮 Gaming (5)`) instead of a wall of buttons; breadcrumbs (`🎁 Gift Cards › Gaming`) on every screen; server-side search.
+- **Crypto→crypto swaps.** A config card: send/receive pair with a 🔁 flip, amount and payout address filled in any order, live quote when both are set. Memo-bearing chains (XRP, XLM, TON) prompt for a memo automatically.
+- **Pay with anything uSwap routes** — BTC, ETH, SOL, USDC/USDT across 16 networks, XMR, LTC, TON and 50+ more; min-deposit shown before you type.
+- **Price-locked quotes** with a live countdown, a spend ceiling bound to what the user approved, and silent re-quote + explicit re-confirmation if the market moves.
+- **Order tracking** — background polling edits the deposit card in place through detected → converting → delivering → done; delivery codes arrive spoiler-wrapped and stay under 🧾 My orders.
+- **Optional refund address** per order (sets the bridge's refund destination) so a failed swap self-recovers.
+- **10 languages**, auto-detected from Telegram, switchable with `/language`.
+- **Inline mode** — `@YourBot amazon` shares a product card with a buy button into any chat (enable once with `/setinline` in @BotFather).
+- **Deep links** — `t.me/YourBot?start=gift-card`, or `?start=gc-amazon` to land on a brand.
+- **Custom emoji + colored buttons** (Bot API 10.x) with automatic per-bot downgrade to unicode when the owner isn't entitled.
+
+## Fleet mode (@SwapFather)
+
+`bun run fleet` hosts a **factory bot** plus every bot minted through it. A tenant pastes a token from @BotFather, picks a brand, a type (shop / swap / both) and which categories to sell, and their bot is live — hosted by you, with no code and no API keys of their own.
+
+Tenants earn a cut of every sale through uSwap's affiliate program (a creator code is registered for them and stamped on every quote). They never touch funds, keys, or credentials.
+
+```bash
+FATHER_BOT_TOKEN=   # the factory bot (@BotFather)
+USWAP_API_KEY=      # your org key — all tenant orders run under it
+FATHER_ORG_ID=      # org accepting affiliate registrations (tenant payouts)
+FLEET_TOKEN_KEY=    # openssl rand -hex 32 — encrypts tenant tokens at rest
+ADMIN_USER_IDS=     # fleet operators (/tenants)
+bun run fleet
+```
+
+⚠️ **`FLEET_TOKEN_KEY` is not rotatable in place** — it decrypts every stored tenant bot token. Losing or changing it orphans the whole fleet. Back it up with your database.
+
+Tenant payouts need self-registration enabled on the organization (uSwap dashboard → Affiliates → registration settings: enable + set a cap, or configure hCaptcha). Design, tenancy model and operator notes: [docs/b4ufather.md](./docs/b4ufather.md).
 
 ## Architecture
 
 ```
 src/
-  main.ts               entry point: grammY bot + order poller
-  config.ts             env config (no secrets in code, ever)
+  main.ts                entry: single-tenant bot (+ order poller)
+  fleet.ts               entry: factory bot + all tenant bots in one process
+  config.ts              env config (no secrets in code, ever)
+  tenant.ts              Tenant model: brand, mode, catalog scope, payouts
   uswap/
-    client.ts           thin typed client for the Partner API
-    types.ts            wire types (catalog level, quotes, intents, delivery vault)
+    client.ts            typed uSwap Partner API client
+    types.ts             wire types (catalog level, quotes, intents, delivery)
   bot/
-    handlers.ts         update routing: commands, callbacks, text input
-    flow.ts             purchase state machine (browse → amount → dest → pay → quote → open)
-    screens.ts          pure renderers: state → { text, keyboard }
-    poller.ts           order status polling + delivery notifications
-    catalog.ts          product families, labels, destination rules
-    session.ts          per-user flow state (SQLite-backed)
-    keyboard.ts         inline keyboard primitives (styles, copy buttons, icons)
-    emoji.ts            uSwap custom emoji with unicode fallbacks
-    uswap-emoji-ids.json ids from the public uSwapAssets/Networks/Banners packs
-  i18n/
-    index.ts            tiny i18n engine ({placeholder} interpolation, en fallback)
-    locales/*.ts        one flat string map per language
+    handlers.ts          update routing: commands, callbacks, text input
+    flow.ts              purchase + swap state machines
+    screens.ts           pure renderers: state → { text, keyboard }
+    poller.ts            order status polling + delivery notifications
+    catalog.ts           product families, labels, destination rules
+    inline.ts            inline-mode product cards
+    session.ts           per-(tenant,user) flow state
+    keyboard.ts          inline keyboards (styles, copy buttons, icons)
+    emoji.ts             uSwap custom emoji with unicode fallbacks
+  father/
+    father.ts            the factory bot: create wizard + manage screens
+    affiliate.ts         affiliate registration / earnings
+  fleet/
+    manager.ts           spawns, stops and reloads tenant bots
+  i18n/                  tiny i18n engine + one flat map per language
   lib/
-    store.ts            SQLite schema + queries (users, sessions, orders)
-    format.ts           raw↔human amounts (BigInt), preset ladders, HTML escaping
-scripts/
-  setup-telegram.ts     set localized bot commands + descriptions
+    store.ts             SQLite schema + queries (multi-tenant)
+    crypto.ts            AES-256-GCM for tokens at rest
+    format.ts            raw↔human amounts (BigInt), preset ladders, escaping
+    telegram-profile.ts  localized commands + descriptions
 ```
 
 ### Purchase pipeline (uSwap Partner API)
 
 ```
-POST /v1/catalog/level            browse: one call per screen, echoed segments descend
-POST /v1/quotes                   input_side:"to" — "I want exactly N stars / $X of card"
-POST /v1/bridges/open             commit: echo draft_id/plan_id/leg_plan_ids/expires_at/request_hash
-                                  + source_amount_ceiling_raw guard + Idempotency-Key
-GET  /v1/intents/{id}             poll: awaiting_deposit → matched → executing → delivering → completed
-GET  /v1/bridges/{id}/digital-delivery   the vault: codes/accounts, spoiler-wrapped in chat
+POST /v1/catalog/level                    browse: one call per screen
+GET  /v1/catalog/assets?side=from|to      payment / receive coins
+GET  /v1/catalog/networks/{chain}/assets  min-deposit bounds
+POST /v1/quotes                           input_side "to" (products) / "from" (swaps)
+POST /v1/bridges/open                     commit: echo the quote tuple byte-exact
+GET  /v1/intents/{id}                     poll to completion
+GET  /v1/bridges/{id}/digital-delivery    the vault: codes, accounts, actions
+POST /v1/bridges/{id}/digital-delivery/actions
+PATCH /v1/bridges/{id}/policies           optional refund destination
+POST /v1/referrals/resolve                creator-code attribution
 ```
 
-Key invariants the code respects (learned the careful way):
+Invariants the code respects (learned the careful way):
 
-- Quote drafts expire in ~5 minutes and are held in memory server-side — on `quote_expired` / `stale_plan` / `quote_not_found` the bot silently re-quotes and retries once.
+- Quote drafts expire in ~5 minutes and live in memory server-side — on `quote_expired` / `stale_plan` / `quote_not_found` the bot re-quotes once and re-confirms if the price moved beyond the approved ceiling.
 - The commit tuple (`draft_id`, `plan_id`, `leg_plan_ids` in order, `expires_at`, `request_hash`) is echoed byte-exact.
-- Deposit addresses come only from the bridge's `ingress_endpoints` — never from a dry quote.
+- Deposit addresses come only from the bridge's `ingress_endpoints`, matched to the chosen chain — never from a dry quote, never a fallback to another chain.
 - Optional API fields are omitted, never sent as `null`.
 - Display amounts come from the committed intent (commit re-quotes internally), not the draft.
-- An expired intent that later receives funds is replaced server-side (`replaced_by_intent_id`); the poller follows the replacement automatically.
+- An expired intent that later receives funds is replaced server-side; the poller follows `replaced_by_intent_id`.
+- `side=to` asset lists expand one row per network — aggregate by symbol before rendering.
 
 ### Custom emoji
 
-uSwap publishes three public custom-emoji packs (owned by @uSwap_Bot):
-[uSwapAssets](https://t.me/addemoji/uSwapAssets_by_uSwap_Bot) ·
-[uSwapNetworks](https://t.me/addemoji/uSwapNetworks_by_uSwap_Bot) ·
-[uSwapBanners](https://t.me/addemoji/uSwapBanners_by_uSwap_Bot)
+uSwap publishes three public packs (owned by @uSwap_Bot):
+[Assets](https://t.me/addemoji/uSwapAssets_by_uSwap_Bot) ·
+[Networks](https://t.me/addemoji/uSwapNetworks_by_uSwap_Bot) ·
+[Banners](https://t.me/addemoji/uSwapBanners_by_uSwap_Bot)
 
-Telegram lets a bot send custom emoji (message entities and button icons) when the **bot owner has Telegram Premium** or the bot owns a Fragment username. The bot renders them optimistically and permanently downgrades to curated unicode the first time Telegram rejects a send — so a self-hosted instance without Premium still looks intentional. Force plain unicode with `CUSTOM_EMOJI=0`.
+Telegram lets a bot send custom emoji (message entities and `icon_custom_emoji_id` button icons) when the **bot owner has Telegram Premium** or the bot holds a Fragment username. Rendering is optimistic; the first rejection (`ENTITY_TEXT_INVALID`) permanently downgrades **that bot** to curated unicode, so a self-hosted instance without Premium still looks intentional. Force plain unicode with `CUSTOM_EMOJI=0`.
 
-## B4UFather — whitelabel fleet
+## Configuration
 
-The repo also ships a hosted multi-tenant mode: **@B4UFatherBot** lets anyone mint their own branded shop bot (whole catalog or a niche — Mullvad-only, Discord-only, gift cards only) in under a minute. Tenants earn a share of every sale through uSwap's affiliate program; they never touch funds or code.
-
-```bash
-bun run fleet   # hosts B4UFather + every tenant bot in one process
-```
-
-Design, tenancy model and environment: [docs/b4ufather.md](./docs/b4ufather.md).
+| Variable | Mode | Purpose |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | single (required) | Your bot, from @BotFather |
+| `USWAP_API_KEY` | both (required) | uSwap partner key |
+| `USWAP_API_BASE` | both | Defaults to `https://partner-api.uswap.net` |
+| `BOT_MODE` | single | `shop` (default), `swap`, or `both` |
+| `BRAND_NAME` / `WELCOME_TEXT` | single | Override the bot's name / home line |
+| `CREATOR_CODE` | single | Your uSwap creator code for attribution |
+| `DATABASE_PATH` | both | SQLite file, default `./data/bestb4u.db` |
+| `SUPPORT_HANDLE` | both | Contact shown to buyers |
+| `CUSTOM_EMOJI` | both | `0` disables custom emoji entirely |
+| `DEBUG` | both | `1` enables debug logging |
+| `FATHER_BOT_TOKEN` | fleet (required) | The factory bot |
+| `FATHER_ORG_ID` | fleet | Org accepting affiliate registrations |
+| `FLEET_TOKEN_KEY` | fleet (required) | 32-byte hex; encrypts tenant tokens |
+| `ADMIN_USER_IDS` | fleet | Comma-separated operator user ids |
+| `MAX_BOTS_PER_OWNER` | fleet | Default 10 |
+| `SWAPFATHER_BOT_TOKEN` | fleet | Optional second factory preset to swap-only |
 
 ## Adding a language
 
-1. Copy `src/i18n/locales/en.ts` to `<code>.ts`, translate the values (keep HTML tags, `{placeholders}` and emoji intact).
+1. Copy `src/i18n/locales/en.ts` to `<code>.ts` and translate the values (keep HTML tags, `{placeholders}` and emoji intact).
 2. Register it in `src/i18n/index.ts` (`locales` map + `SUPPORTED_LANGUAGES`).
-3. Optionally add localized commands/descriptions in `scripts/setup-telegram.ts`.
+3. Optionally add localized commands/descriptions in `src/lib/telegram-profile.ts`.
 
-Missing keys fall back to English, so partial translations are safe.
+Missing keys fall back to English, so partial translations are safe to ship.
 
 ## Operational notes
 
-- **Polling, not webhooks.** Order status is polled every 8s per active order; webhook support (uSwap signs with HMAC-SHA256) is a welcome contribution for high-volume deployments.
-- The bot only talks to `partner-api.uswap.net` and `api.telegram.org`. The uSwap API key never leaves the server; buyers never see it.
-- `fulfillment` is uSwap's responsibility — if an order lands in a held/failed state the bot tells the user their funds are safe and to contact support.
+- **Polling, not webhooks.** Orders are polled every 8s; webhook support (uSwap signs with HMAC-SHA256) is a welcome contribution for high-volume deployments.
+- The bot talks only to `api.telegram.org` and your uSwap API base. The API key never leaves the server; buyers never see it.
+- Fulfilment is uSwap's responsibility — if an order lands in a held/failed state the bot tells the buyer their funds are safe and points them at support.
+- Back up `DATABASE_PATH` (and `FLEET_TOKEN_KEY` alongside it, in fleet mode).
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the UX principles and API rules. Security issues: [SECURITY.md](./SECURITY.md).
 
 ## License
 

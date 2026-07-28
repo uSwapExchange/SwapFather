@@ -28,7 +28,9 @@ tenants (SQLite, fleet-owned)
   bot_username      TEXT
   bot_token_enc     TEXT                  -- AES-256-GCM, key = FLEET_TOKEN_KEY
   owner_user_id     INTEGER               -- Telegram user who created it
+  mode              TEXT                  -- shop | swap | both
   brand_name        TEXT
+  welcome_text      TEXT NULL             -- custom home line
   support_handle    TEXT NULL
   families          TEXT NULL             -- JSON array of family ids; NULL = all
   creator_code      TEXT NULL             -- affiliate username; NULL = earnings not set up
@@ -60,21 +62,22 @@ Create wizard:
  1. Token     — "Make a bot in @BotFather (/newbot), paste the token here."
                 Validated live via getMe; rejects tokens already enrolled.
  2. Brand     — default = the bot's Telegram name; free-text override.
- 3. Catalog   — [🛍 Everything] or multi-select toggles per family
+ 3. Type      — 🛍 Shop / 🔄 Swap / both (a swap-preset alias bot skips this)
+ 4. Catalog   — [🛍 Everything] or multi-select toggles per family
                 (✓ Gift Cards, ✗ Telegram, …) — the list is live from the
                 catalog, so new uSwap families appear automatically.
- 4. Support   — optional @handle shown to their buyers.
- 5. Payout    — optional now, required to earn: NEAR account (required by
+ 5. Support   — optional @handle shown to their buyers.
+ 6. Payout    — optional now, addable any time later from the manage screen: NEAR account (required by
                 the API) + optional XMR; picks a creator code (default:
                 bot username), registers the affiliate, stores the
                 self-service token. "Set up later" keeps the bot fully
                 functional with no attribution.
- 6. Live      — tenant row saved, bot spawned into the fleet, localized
+ 7. Live      — tenant row saved, bot spawned into the fleet, localized
                 commands + "what can this bot do?" description pushed to
                 the child bot with their brand.
 
 My bots → per bot: ⏸ pause/▶ resume · ✏️ brand · 🗂 categories ·
-          💬 support · 💰 payout/earnings (via /v1/affiliate/earnings) ·
+          📝 welcome · 💬 support · 💰 set up payouts / earnings ·
           🗑 remove
 ```
 

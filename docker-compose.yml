@@ -5,15 +5,18 @@ services:
   fleet:
     build: .
     restart: unless-stopped
+    # Fleet mode by default. For a single bot instead:
+    #   command: ["bun", "run", "src/main.ts"]   (needs TELEGRAM_BOT_TOKEN)
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - BOT_MODE=${BOT_MODE:-both}
+      - BOT_MODE=${BOT_MODE:-shop}
       - USWAP_API_KEY=${USWAP_API_KEY}
       - USWAP_API_BASE=${USWAP_API_BASE:-https://partner-api.uswap.net}
       - FATHER_BOT_TOKEN=${FATHER_BOT_TOKEN}
       - FATHER_ORG_ID=${FATHER_ORG_ID}
       - FLEET_TOKEN_KEY=${FLEET_TOKEN_KEY}
       - ADMIN_USER_IDS=${ADMIN_USER_IDS}
+      - MAX_BOTS_PER_OWNER=${MAX_BOTS_PER_OWNER:-10}
       - SUPPORT_HANDLE=${SUPPORT_HANDLE:-@maintenance}
       - DATABASE_PATH=/app/data/bestb4u.db
     volumes:
