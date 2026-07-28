@@ -9,7 +9,7 @@
 import { Bot } from "grammy";
 import { config } from "./config.ts";
 import { logger } from "./lib/logger.ts";
-import { listTenants } from "./lib/store.ts";
+import { listTenants, pruneStaleSessions } from "./lib/store.ts";
 import { registerHandlers } from "./bot/handlers.ts";
 import { registerInline } from "./bot/inline.ts";
 import { startPoller } from "./bot/poller.ts";
@@ -81,6 +81,10 @@ startPoller((tenantId) =>
 );
 
 getFamilies().catch((err) => logger.warn("catalog warmup failed", { err: String(err) }));
+
+// Wizard/shop sessions expire; stale rows can hold in-flight state.
+pruneStaleSessions();
+setInterval(() => pruneStaleSessions(), 6 * 60 * 60 * 1000);
 
 logger.info("fleet starting", {
   father: fatherMe.username,

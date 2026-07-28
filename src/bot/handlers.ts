@@ -565,6 +565,10 @@ export function registerHandlers(bot: Bot, tenant: Tenant) {
 
   bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery.data;
+    if (ctx.from && tapTooFast(tenant.id, ctx.from.id)) {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
     try {
       await handleCallback(ctx, data);
       await ctx.answerCallbackQuery().catch(() => {});
@@ -599,11 +603,35 @@ function autoSelectSingleLeaf(s: FlowSession): boolean {
   return false;
 }
 
+/** Per-(tenant,user) tap throttle — every tap can hit the partner API. */
+const lastTapAt = new Map<string, number>();
+const MIN_TAP_INTERVAL_MS = 350;
+
+function tapTooFast(tenantId: number, userId: number): boolean {
+  const key = `${tenantId}:${userId}`;
+  const now = Date.now();
+  const prev = lastTapAt.get(key) ?? 0;
+  if (now - prev < MIN_TAP_INTERVAL_MS) return true;
+  lastTapAt.set(key, now);
+  if (lastTapAt.size > 10_000) {
+    for (const [k, v] of lastTapAt) if (now - v > 60_000) lastTapAt.delete(k);
+  }
+  return false;
+}
+
 type RunUi = (ctx: Context, fn: (u: Uctx) => Promise<void>) => Promise<void>;
 
 function makeRunUi(tenant: Tenant): RunUi {
   return async (ctx, fn) => {
     if (!ctx.from || !ctx.chat) return;
+    // Purchases and delivery vaults are private by construction: an order
+    // opened in a group would post its codes back into that group.
+    if (ctx.chat.type !== "private") {
+      await ctx
+        .answerCallbackQuery?.({ text: "Open me in a private chat 🙂", show_alert: true })
+        .catch(() => {});
+      return;
+    }
     const { t } = getT(tenant, ctx);
     const s = loadSession(tenant.id, ctx.from.id) as FlowSession;
     const u: Uctx = { ctx, s, t, tenant, userId: ctx.from.id, chatId: ctx.chat.id };
@@ -664,6 +692,10 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
         return showHome(u);
       }
       case "c": {
+        // A niche bot must stay niche even if an old button or a crafted
+        // callback points at a family the tenant disabled.
+        if (u.tenant.families && !u.tenant.families.includes(arg)) return showHome(u);
+        if (!sellsProducts(u.tenant)) return showHome(u);
         await flow.enterLevel(s, {
           asset: arg,
           segments: [],
@@ -794,10 +826,12 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
         return showCurrent(u);
       }
       case "sw": {
+        if (!sellsSwaps(u.tenant)) return showHome(u);
         await flow.startSwap(s);
         return showCurrent(u);
       }
       case "sc": {
+        if (!sellsSwaps(u.tenant)) return showHome(u);
         const d = s.draft;
         if (!d?.swap) {
           await flow.startSwap(s);
@@ -901,12 +935,29 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
         const [orderIdStr = "", itemId = "", ...actionParts] = arg.split(":");
         const order = getOrder(Number(orderIdStr));
         if (!order || order.user_id !== u.userId || order.tenant_id !== u.tenant.id) return;
+        const action = actionParts.join(":");
+        // Only run actions the vault itself advertises for this exact item.
+        try {
+          const vault = await uswap.getDigitalDelivery(order.bridge_id, order.intent_id);
+          const item = vault.items.find((i) => i.id === itemId);
+          if (!item || !(item.actions ?? []).includes(action)) {
+            await ctx
+              .answerCallbackQuery({ text: u.t("error.generic"), show_alert: true })
+              .catch(() => {});
+            return;
+          }
+        } catch {
+          await ctx
+            .answerCallbackQuery({ text: u.t("error.generic"), show_alert: true })
+            .catch(() => {});
+          return;
+        }
         try {
           await uswap.runDeliveryAction(
             order.bridge_id,
             {
               delivery_item_id: itemId,
-              action: actionParts.join(":"),
+              action,
               intent_id: order.intent_id,
             },
             `da-${order.id}-${Date.now()}`,

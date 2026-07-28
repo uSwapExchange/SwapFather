@@ -33,7 +33,8 @@ import { affiliateEarnings, AffiliateError, registerAffiliate } from "./affiliat
 
 interface FDraft {
   mode?: TenantMode;
-  botToken: string;
+  /** AES-GCM ciphertext — the session row is plain JSON on disk. */
+  botTokenEnc: string;
   botId: number;
   botUsername: string;
   botName: string;
@@ -45,7 +46,7 @@ interface FDraft {
   near?: string;
   xmr?: string;
   registered?: boolean;
-  affiliateToken?: string;
+  affiliateTokenEnc?: string;
 }
 
 interface FSession {
@@ -77,6 +78,9 @@ interface Fctx {
   userId: number;
   chatId: number;
 }
+
+/** Guard-rail for the hosted fleet; admins are exempt. */
+const MAX_BOTS_PER_OWNER = Number(process.env.MAX_BOTS_PER_OWNER ?? 10);
 
 const admins = (process.env.ADMIN_USER_IDS ?? "")
   .split(",")
@@ -271,7 +275,10 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
 
   function ownsTenant(f: Fctx, id: number): boolean {
     const row = getTenantRow(id);
-    return Boolean(row && (row.owner_user_id === f.userId || admins.includes(f.userId)));
+    if (!row || row.status === "deleted") return false;
+    // 'banned' is an operator decision — owners can't manage their way out.
+    if (row.status === "banned" && !admins.includes(f.userId)) return false;
+    return row.owner_user_id === f.userId || admins.includes(f.userId);
   }
 
   async function handleCallback(ctx: Context) {
@@ -396,6 +403,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           const id = Number(a);
           if (!ownsTenant(f, id)) return;
           const row = getTenantRow(id)!;
+          if (row.status !== "active" && row.status !== "paused") return;
           const next = row.status === "active" ? "paused" : "active";
           updateTenant(id, { status: next });
           await reloadTenant(id);
@@ -599,6 +607,26 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
         keyboard: [[btn("‹ Cancel", "h", "danger")]],
       });
     }
+    const owned = listTenants({ ownerUserId: f.userId });
+    if (owned.length >= MAX_BOTS_PER_OWNER && !admins.includes(f.userId)) {
+      return show(f, {
+        text: `⚠️ You've reached the limit of ${MAX_BOTS_PER_OWNER} bots. Remove one first, or contact support.`,
+        keyboard: [[btn("📋 My bots", "m")], [btn("‹ Cancel", "h", "danger")]],
+      });
+    }
+    try {
+      const hook = (await new ProbeBot(token).api.getWebhookInfo()) as {
+        url?: string;
+      };
+      if (hook.url) {
+        return show(f, {
+          text: "⚠️ That bot already has a webhook set — it's running somewhere else. Delete the webhook (or use a fresh bot from @BotFather) and try again.",
+          keyboard: [[btn("‹ Cancel", "h", "danger")]],
+        });
+      }
+    } catch {
+      // getWebhookInfo is advisory; a failure shouldn't block onboarding
+    }
     if (getTenantByBotId(me.id)) {
       return show(f, {
         text: `⚠️ @${me.username} is already enrolled. Manage it under 📋 My bots, or paste a different token.`,
@@ -606,7 +634,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       });
     }
     f.s.draft = {
-      botToken: token,
+      botTokenEnc: encryptSecret(token),
       botId: me.id,
       botUsername: me.username,
       botName: me.first_name,
@@ -781,7 +809,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
         xmrAddress: d.xmr,
       });
       d.registered = true;
-      d.affiliateToken = reg.token ?? undefined;
+      d.affiliateTokenEnc = reg.token ? encryptSecret(reg.token) : undefined;
       return showConfirm(f);
     } catch (err) {
       const msg = err instanceof AffiliateError ? err.message : "registration failed";
@@ -803,13 +831,13 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       mode: d.mode ?? "shop",
       botId: d.botId,
       botUsername: d.botUsername,
-      botTokenEnc: encryptSecret(d.botToken),
+      botTokenEnc: d.botTokenEnc,
       ownerUserId: f.userId,
       brandName: d.brand ?? d.botName,
       supportHandle: d.support ?? null,
       families: d.everything || !d.families?.length ? null : d.families,
       creatorCode: d.registered ? (d.code ?? null) : null,
-      affiliateTokenEnc: d.affiliateToken ? encryptSecret(d.affiliateToken) : null,
+      affiliateTokenEnc: d.affiliateTokenEnc ?? null,
     });
     const tenant = rowToTenant(getTenantRow(tenantId)!);
     await fleet.spawn(tenant);

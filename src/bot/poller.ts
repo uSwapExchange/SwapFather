@@ -43,10 +43,16 @@ function translatorForOrder(order: OrderRow) {
 export type ApiResolver = (tenantId: number) => Api | undefined;
 
 export function startPoller(getApi: ApiResolver) {
+  let inFlight = false;
   setInterval(() => {
-    void pollOnce(getApi).catch((err) =>
-      logger.error("poll cycle failed", { err: String(err) }),
-    );
+    // A slow cycle must not stack: overlapping sweeps double-notify.
+    if (inFlight) return;
+    inFlight = true;
+    void pollOnce(getApi)
+      .catch((err) => logger.error("poll cycle failed", { err: String(err) }))
+      .finally(() => {
+        inFlight = false;
+      });
   }, POLL_INTERVAL_MS);
   logger.info("order poller started", { intervalMs: POLL_INTERVAL_MS });
 }

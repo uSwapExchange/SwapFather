@@ -429,6 +429,13 @@ export function updateTenant(
 
 // ---------- father wizard sessions ----------
 
+/** Wizard sessions can hold in-flight secrets — don't keep them forever. */
+export function pruneStaleSessions(maxAgeHours = 24): void {
+  const cutoff = new Date(Date.now() - maxAgeHours * 3600_000).toISOString();
+  db.query("DELETE FROM father_sessions WHERE updated_at < ?1").run(cutoff);
+  db.query("DELETE FROM sessions WHERE updated_at < ?1").run(cutoff);
+}
+
 export function getFatherSession<T>(userId: number): T | null {
   const row = db
     .query<{ state: string }, [number]>(
