@@ -367,19 +367,29 @@ async function loadCryptoChoices(counterpart?: string): Promise<PayAssetChoice[]
     side: "to",
     ...(counterpart ? { counterpart_asset_v1: counterpart } : {}),
   });
-  return res.items
-    .filter((a) => a.category === "Crypto")
-    .map((a) => ({
-      assetId: a.asset_id,
-      symbol: a.symbol,
-      name: a.name,
-      networks: a.networks.map((n) => ({
-        asset_v1: n.asset_v1,
-        chain_id: n.chain_id,
-        chain_name: n.chain_name,
-        decimals: n.decimals,
-      })),
-    }));
+  // The destination-side list expands one row PER NETWORK (ETH ×7, USDC ×16),
+  // each row already carrying the full networks[] — aggregate to one choice
+  // per asset or the picker shows a wall of duplicates.
+  const byAsset = new Map<string, PayAssetChoice>();
+  for (const a of res.items) {
+    if (a.category !== "Crypto") continue;
+    let choice = byAsset.get(a.asset_id);
+    if (!choice) {
+      choice = { assetId: a.asset_id, symbol: a.symbol, name: a.name, networks: [] };
+      byAsset.set(a.asset_id, choice);
+    }
+    for (const n of a.networks) {
+      if (!choice.networks.some((x) => x.asset_v1 === n.asset_v1)) {
+        choice.networks.push({
+          asset_v1: n.asset_v1,
+          chain_id: n.chain_id,
+          chain_name: n.chain_name,
+          decimals: n.decimals,
+        });
+      }
+    }
+  }
+  return [...byAsset.values()];
 }
 
 export async function startSwap(s: FlowSession): Promise<void> {
