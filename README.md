@@ -29,8 +29,8 @@ Every screen is one anchored message edited in place — the chat never fills wi
 Requirements: [bun](https://bun.sh) ≥ 1.1.
 
 ```bash
-git clone https://github.com/uSwapExchange/best-b4u
-cd best-b4u
+git clone https://github.com/uSwapExchange/swapfather
+cd swapfather
 bun install
 
 cp .env.example .env
