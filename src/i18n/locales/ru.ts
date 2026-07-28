@@ -142,4 +142,11 @@ export const ru: Partial<Locale> = {
   "btn.refundAddr": "↩️ Добавить адрес возврата",
   "refund.prompt": "Необязательная подстраховка: отправьте адрес <b>{symbol}</b> для автоматического возврата, если с заказом что-то пойдёт не так.",
   "refund.set": "✅ Адрес возврата сохранён для этого заказа.",
+  "swap.receive": "Вы получаете",
+  "swap.notset": "не задано",
+  "btn.flipPair": "🔁",
+  "btn.setAmount": "💵 Сумма",
+  "btn.setAddress": "📍 Адрес",
+  "btn.getQuote": "⚡️ Получить курс",
+  "swap.incomplete": "Сначала укажите сумму и адрес получения.",
 };

@@ -21,7 +21,7 @@ import {
   leafNeedsDestination,
   productLabel,
 } from "./catalog.ts";
-import type { NavLevel, PageItem, PayAssetChoice, Session } from "./session.ts";
+import type { Draft, NavLevel, PageItem, PayAssetChoice, Session } from "./session.ts";
 import type { Tenant } from "../tenant.ts";
 import { humanToRaw, rawToHuman } from "../lib/format.ts";
 import { leafPackKey } from "./emoji.ts";
@@ -58,6 +58,7 @@ async function referralTokenFor(tenant: Tenant): Promise<string | undefined> {
 
 export type ScreenId =
   | "home"
+  | "swcard"
   | "swto"
   | "swtonet"
   | "swaddr"
@@ -394,11 +395,77 @@ async function loadCryptoChoices(counterpart?: string): Promise<PayAssetChoice[]
   return [...byAsset.values()];
 }
 
+/**
+ * Open the swap config card (uSwapZero-style hub): both sides pre-set to a
+ * sensible default pair (BTC → XMR), amount/address filled in any order.
+ */
 export async function startSwap(s: FlowSession): Promise<void> {
   s.draft = undefined;
   s.swapChoices = await loadCryptoChoices();
   s.swapMore = false;
-  s.screen = "swto";
+  const receive = s.swapChoices.find((c) => c.symbol === "XMR") ?? s.swapChoices[0];
+  if (receive) selectSwapToNetwork(s, receive, 0);
+  if (s.draft) {
+    const d: Draft = s.draft;
+    await loadPayChoices(s);
+    const send =
+      s.payChoices?.find((c) => c.symbol === "BTC" && c.networks.some((n) => n.chain_id === "bitcoin")) ??
+      s.payChoices?.[0];
+    if (send) {
+      const netIdx = Math.max(0, send.networks.findIndex((n) => n.chain_id === "bitcoin"));
+      const net = send.networks[netIdx];
+      if (net) {
+        d.payAssetV1 = net.asset_v1;
+        d.paySymbol = send.symbol;
+        d.payChainId = net.chain_id;
+        d.payChainName = net.chain_name;
+        d.payDecimals = net.decimals;
+      }
+    }
+  }
+  s.screen = "swcard";
+}
+
+/** Both inputs the quote needs are present. */
+export function swapReady(s: FlowSession): boolean {
+  const d = s.draft;
+  return Boolean(d?.swap && d.payAssetV1 && d.leaf && d.amountHuman && d.destination);
+}
+
+/**
+ * Flip send ↔ receive. The typed amount survives only when it was entered in
+ * USD; the receive address never survives (it belongs to the old coin).
+ */
+export async function flipSwap(s: FlowSession): Promise<void> {
+  const d = s.draft;
+  if (!d?.swap || !d.payAssetV1 || !d.payChainId) return;
+  const oldLeaf = d.leaf;
+  d.leaf = {
+    asset_v1: d.payAssetV1,
+    symbol: d.paySymbol ?? "",
+    name: d.paySymbol ?? "",
+    decimals: d.payDecimals ?? 0,
+    chain: {
+      id: d.payChainId,
+      name: d.payChainName ?? d.payChainId,
+      unit_label: d.paySymbol,
+      address_type: "crypto",
+      destination_required: true,
+    },
+  };
+  d.productLabel = `${d.leaf.symbol} (${d.leaf.chain.name})`;
+  d.payAssetV1 = oldLeaf.asset_v1;
+  d.paySymbol = oldLeaf.symbol;
+  d.payChainId = oldLeaf.chain.id;
+  d.payChainName = oldLeaf.chain.name;
+  d.payDecimals = oldLeaf.decimals;
+  if (d.inputType !== "usd") d.amountHuman = undefined;
+  d.destination = undefined;
+  d.destinationMemo = undefined;
+  d.payMinHuman = undefined;
+  d.payMinUsd = undefined;
+  d.quote = undefined;
+  s.screen = "swcard";
 }
 
 export function pickSwapTo(s: FlowSession, idx: number): ScreenId {
@@ -420,6 +487,7 @@ export function selectSwapToNetwork(
   const net = choice.networks[netIdx];
   if (!net) return s.screen ?? "swto";
   // A swap destination is a synthesized "leaf": the receive asset itself.
+  const prev = s.draft;
   s.draft = {
     swap: true,
     leaf: {
@@ -437,8 +505,23 @@ export function selectSwapToNetwork(
     },
     productLabel: `${choice.symbol} (${net.chain_name})`,
     inputSide: "from",
+    // keep the send side + amount when re-picking the receive coin
+    ...(prev?.swap
+      ? {
+          payAssetV1: prev.payAssetV1,
+          paySymbol: prev.paySymbol,
+          payChainId: prev.payChainId,
+          payChainName: prev.payChainName,
+          payDecimals: prev.payDecimals,
+          payMinHuman: prev.payMinHuman,
+          payMinUsd: prev.payMinUsd,
+          amountHuman: prev.amountHuman,
+          inputType: prev.inputType,
+        }
+      : {}),
   };
-  s.screen = "swaddr";
+  // the old address belonged to the old receive coin
+  s.screen = "swcard";
   return s.screen;
 }
 
@@ -528,9 +611,15 @@ export function selectPayNetwork(
   draft.payChainId = net.chain_id;
   draft.payChainName = net.chain_name;
   draft.payDecimals = net.decimals;
-  // Products know their amount already; swaps ask for it after the pay coin
-  // (the amount is denominated in the coin being sent).
-  s.screen = draft.swap ? "swamount" : "quote";
+  if (draft.swap) {
+    // back to the config card; a coin-denominated amount belonged to the old coin
+    if (draft.inputType !== "usd") draft.amountHuman = undefined;
+    draft.payMinHuman = undefined;
+    draft.payMinUsd = undefined;
+    s.screen = "swcard";
+    return s.screen;
+  }
+  s.screen = "quote";
   return s.screen;
 }
 

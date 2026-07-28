@@ -142,4 +142,11 @@ export const fa: Partial<Locale> = {
   "btn.refundAddr": "↩️ افزودن آدرس بازپرداخت",
   "refund.prompt": "شبکه امنیتی اختیاری: یک آدرس <b>{symbol}</b> بفرستید تا در صورت بروز مشکل در این سفارش، بازپرداخت خودکار انجام شود.",
   "refund.set": "✅ آدرس بازپرداخت برای این سفارش ذخیره شد.",
+  "swap.receive": "دریافت می‌کنید",
+  "swap.notset": "تنظیم نشده",
+  "btn.flipPair": "🔁",
+  "btn.setAmount": "💵 مقدار",
+  "btn.setAddress": "📍 آدرس",
+  "btn.getQuote": "⚡️ دریافت نرخ",
+  "swap.incomplete": "ابتدا مقدار و آدرس دریافت را تنظیم کنید.",
 };

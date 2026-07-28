@@ -12,6 +12,7 @@ import type { DeliveryItem } from "../uswap/types.ts";
 import { esc, niceCrypto, presetAmounts, rawToHuman, usd } from "../lib/format.ts";
 import {
   assetEmojiChar,
+  assetEmojiHtml,
   assetIconId,
   categoryEmojiChar,
   leafEmoji,
@@ -234,6 +235,61 @@ export function renderDest(
 }
 
 // ---------- swap ----------
+
+/**
+ * The swap hub: a uSwapZero-style config card. Pair on top with a flip
+ * button, amount + address filled in any order, quote unlocks when ready.
+ */
+export function renderSwapCard(
+  t: Translator,
+  draft: Draft,
+  opts: { hideNav?: boolean } = {},
+): Screen {
+  const sendSym = draft.paySymbol ?? "?";
+  const recvSym = draft.leaf.symbol;
+  const notSet = `<i>${t("swap.notset")}</i>`;
+  const amountDisplay = draft.amountHuman
+    ? draft.inputType === "usd"
+      ? `<b>$${esc(draft.amountHuman)}</b> <i>(in ${esc(sendSym)})</i>`
+      : `<b>${esc(draft.amountHuman)} ${esc(sendSym)}</b>`
+    : notSet;
+  const addrDisplay = draft.destination
+    ? `<code>${esc(draft.destination.length > 24 ? draft.destination.slice(0, 10) + "…" + draft.destination.slice(-8) : draft.destination)}</code>`
+    : notSet;
+  const lines = [
+    `🔄 <b>${t("btn.swap").replace("🔄 ", "")}</b>`,
+    "",
+    `↗️ ${t("quote.yousend")}:  ${assetEmojiHtml(sendSym)} <b>${esc(sendSym)}</b> <i>(${esc(draft.payChainName ?? "")})</i>`,
+    `↘️ ${t("swap.receive")}:  ${assetEmojiHtml(recvSym)} <b>${esc(recvSym)}</b> <i>(${esc(draft.leaf.chain.name)})</i>`,
+    "",
+    `💵 ${t("btn.setAmount").replace("💵 ", "")}:  ${amountDisplay}`,
+    `📍 ${t("btn.setAddress").replace("📍 ", "")}:  ${addrDisplay}`,
+  ];
+  if (draft.payMinHuman) {
+    lines.push(
+      "",
+      t("swap.minDeposit", {
+        min: `${draft.payMinHuman} ${esc(sendSym)}`,
+        usd: draft.payMinUsd ? `$${draft.payMinUsd}` : "",
+      }),
+    );
+  }
+  const ready = Boolean(draft.amountHuman && draft.destination);
+  const keyboard: Keyboard = [
+    [
+      btn(`↗️ ${sendSym}`, "sc:s", undefined, assetIconId(sendSym)),
+      btn(t("btn.flipPair"), "sc:f"),
+      btn(`↘️ ${recvSym}`, "sc:r", undefined, assetIconId(recvSym)),
+    ],
+    [
+      btn(`${draft.amountHuman ? "✅" : "🔴"} ${t("btn.setAmount")}`, "sc:a"),
+      btn(`${draft.destination ? "✅" : "🔴"} ${t("btn.setAddress")}`, "sc:d"),
+    ],
+  ];
+  if (ready) keyboard.push([btn(t("btn.getQuote"), "sc:q", "success")]);
+  if (!opts.hideNav) keyboard.push([btn(t("btn.home"), "h")]);
+  return { text: lines.join("\n"), keyboard };
+}
 
 export function renderSwapTo(
   t: Translator,

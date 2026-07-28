@@ -142,4 +142,11 @@ export const es: Partial<Locale> = {
   "btn.refundAddr": "↩️ Añadir dirección de reembolso",
   "refund.prompt": "Red de seguridad opcional: envía una dirección de <b>{symbol}</b> para reembolsos automáticos si algo sale mal con este pedido.",
   "refund.set": "✅ Dirección de reembolso guardada para este pedido.",
+  "swap.receive": "Recibes",
+  "swap.notset": "sin definir",
+  "btn.flipPair": "🔁",
+  "btn.setAmount": "💵 Cantidad",
+  "btn.setAddress": "📍 Dirección",
+  "btn.getQuote": "⚡️ Obtener cotización",
+  "swap.incomplete": "Primero define la cantidad y la dirección de recepción.",
 };

@@ -142,4 +142,11 @@ export const fr: Partial<Locale> = {
   "btn.refundAddr": "↩️ Ajouter une adresse de remboursement",
   "refund.prompt": "Filet de sécurité optionnel : envoie une adresse <b>{symbol}</b> pour un remboursement automatique en cas de problème avec cette commande.",
   "refund.set": "✅ Adresse de remboursement enregistrée pour cette commande.",
+  "swap.receive": "Tu reçois",
+  "swap.notset": "non défini",
+  "btn.flipPair": "🔁",
+  "btn.setAmount": "💵 Montant",
+  "btn.setAddress": "📍 Adresse",
+  "btn.getQuote": "⚡️ Obtenir un devis",
+  "swap.incomplete": "Définis d'abord le montant et l'adresse de réception.",
 };

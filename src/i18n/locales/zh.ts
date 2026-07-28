@@ -142,4 +142,11 @@ export const zh: Partial<Locale> = {
   "btn.refundAddr": "↩️ 添加退款地址",
   "refund.prompt": "可选保障：发送一个 <b>{symbol}</b> 地址，若此订单出现问题将自动退款。",
   "refund.set": "✅ 已为此订单保存退款地址。",
+  "swap.receive": "你将收到",
+  "swap.notset": "未设置",
+  "btn.flipPair": "🔁",
+  "btn.setAmount": "💵 金额",
+  "btn.setAddress": "📍 地址",
+  "btn.getQuote": "⚡️ 获取报价",
+  "swap.incomplete": "请先设置金额和收款地址。",
 };

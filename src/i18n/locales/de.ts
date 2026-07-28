@@ -142,4 +142,11 @@ export const de: Partial<Locale> = {
   "btn.refundAddr": "↩️ Rückerstattungsadresse hinzufügen",
   "refund.prompt": "Optionales Sicherheitsnetz: sende eine <b>{symbol}</b>-Adresse für automatische Rückerstattung, falls bei dieser Bestellung etwas schiefgeht.",
   "refund.set": "✅ Rückerstattungsadresse für diese Bestellung gespeichert.",
+  "swap.receive": "Du erhältst",
+  "swap.notset": "nicht gesetzt",
+  "btn.flipPair": "🔁",
+  "btn.setAmount": "💵 Betrag",
+  "btn.setAddress": "📍 Adresse",
+  "btn.getQuote": "⚡️ Kurs holen",
+  "swap.incomplete": "Lege zuerst Betrag und Empfangsadresse fest.",
 };

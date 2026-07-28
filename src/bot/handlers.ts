@@ -168,13 +168,16 @@ async function showCurrent(u: Uctx): Promise<void> {
   switch (s.screen) {
     case "browse":
       return showBrowse(u);
-    case "swto":
-      // A swap-only bot's root is the receive picker — no back/home loop.
+    case "swcard":
+      await flow.loadPayMinDeposit(s);
       return showScreen(
         u,
-        screens.renderSwapTo(u.t, s.swapChoices ?? [], s.swapMore ?? false, {
-          hideNav: !sellsProducts(u.tenant),
-        }),
+        screens.renderSwapCard(u.t, s.draft!, { hideNav: !sellsProducts(u.tenant) }),
+      );
+    case "swto":
+      return showScreen(
+        u,
+        screens.renderSwapTo(u.t, s.swapChoices ?? [], s.swapMore ?? false),
       );
     case "swtonet":
       return showScreen(u, screens.renderSwapToNetworks(u.t, s.swapNetChoice!));
@@ -372,20 +375,23 @@ async function showOrderDetail(u: Uctx, orderId: number) {
 async function goBack(u: Uctx) {
   const s = u.s;
   switch (s.screen) {
-    case "swto":
+    case "swcard":
       s.draft = undefined;
       return showHome(u);
+    case "swto":
+      s.screen = "swcard";
+      return showCurrent(u);
     case "swtonet":
       s.screen = "swto";
       return showCurrent(u);
     case "swaddr":
-      s.screen = s.swapNetChoice && s.swapNetChoice.networks.length > 1 ? "swtonet" : "swto";
+      s.screen = "swcard";
       return showCurrent(u);
     case "swmemo":
       s.screen = "swaddr";
       return showCurrent(u);
     case "swamount":
-      s.screen = "pay";
+      s.screen = "swcard";
       return showCurrent(u);
     case "browse": {
       s.nav.pop();
@@ -404,7 +410,7 @@ async function goBack(u: Uctx) {
     case "pay": {
       const draft = s.draft;
       if (draft?.swap) {
-        s.screen = flow.swapNeedsMemo(s) ? "swmemo" : "swaddr";
+        s.screen = "swcard";
         return showCurrent(u);
       }
       if (draft && (draft.destination || !draft.leaf.chain.address_prompt)) {
@@ -423,7 +429,7 @@ async function goBack(u: Uctx) {
       s.screen = "pay";
       return showCurrent(u);
     case "quote":
-      s.screen = s.draft?.swap ? "swamount" : "pay";
+      s.screen = s.draft?.swap ? "swcard" : "pay";
       return showCurrent(u);
     default:
       return showHome(u);
@@ -748,6 +754,42 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
         await flow.startSwap(s);
         return showCurrent(u);
       }
+      case "sc": {
+        const d = s.draft;
+        if (!d?.swap) {
+          await flow.startSwap(s);
+          return showCurrent(u);
+        }
+        switch (arg) {
+          case "f":
+            await flow.flipSwap(s);
+            return showCurrent(u);
+          case "s":
+            s.payMore = false;
+            await flow.loadPayChoices(s);
+            s.screen = "pay";
+            return showCurrent(u);
+          case "r":
+            s.swapMore = false;
+            s.screen = "swto";
+            return showCurrent(u);
+          case "a":
+            s.screen = "swamount";
+            return showCurrent(u);
+          case "d":
+            s.screen = "swaddr";
+            return showCurrent(u);
+          case "q":
+            if (!flow.swapReady(s)) {
+              return ctx
+                .answerCallbackQuery({ text: u.t("swap.incomplete"), show_alert: true })
+                .catch(() => {}) as Promise<void>;
+            }
+            s.screen = "quote";
+            return showCurrent(u);
+        }
+        return showCurrent(u);
+      }
       case "st": {
         if (arg === "m") {
           s.swapMore = true;
@@ -764,8 +806,7 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
       case "sm": {
         s.awaiting = null;
         s.draft!.destinationMemo = undefined;
-        s.screen = "pay";
-        await flow.loadPayChoices(s);
+        s.screen = "swcard";
         return showCurrent(u);
       }
       case "sa": {
@@ -775,7 +816,7 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
         draft.amountHuman = arg;
         draft.inputType = "usd";
         draft.inputSide = "from";
-        s.screen = "quote";
+        s.screen = "swcard";
         return showCurrent(u);
       }
       case "cf":
@@ -908,16 +949,14 @@ function makeHandleText(runUi: RunUi) {
           s.screen = "swmemo";
           return showCurrent(u);
         }
-        s.screen = "pay";
-        await flow.loadPayChoices(s);
+        s.screen = "swcard";
         return showCurrent(u);
       }
       case "swmemo": {
         s.awaiting = null;
         s.draft!.destinationMemo = text.trim().slice(0, 32) || undefined;
         await deleteUserMessage(ctx);
-        s.screen = "pay";
-        await flow.loadPayChoices(s);
+        s.screen = "swcard";
         return showCurrent(u);
       }
       case "swamount": {
@@ -932,7 +971,7 @@ function makeHandleText(runUi: RunUi) {
         draft.inputType = parsed.inputType;
         draft.inputSide = "from";
         await deleteUserMessage(ctx);
-        s.screen = "quote";
+        s.screen = "swcard";
         return showCurrent(u);
       }
       case "refund": {

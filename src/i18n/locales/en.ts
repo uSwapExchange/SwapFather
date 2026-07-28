@@ -66,6 +66,13 @@ export const en = {
   "swap.amountPrompt":
     "How much are you swapping? Send an amount in <b>{symbol}</b> (like <code>0.1</code>) or in dollars (like <code>$100</code>):",
   "swap.youreceive": "You get (estimated)",
+  "swap.receive": "You receive",
+  "swap.notset": "not set",
+  "btn.flipPair": "🔁",
+  "btn.setAmount": "💵 Amount",
+  "btn.setAddress": "📍 Address",
+  "btn.getQuote": "⚡️ Get quote",
+  "swap.incomplete": "Set the amount and receive address first.",
   "swap.invalidAmount": "Send a number like <code>0.25</code> or <code>$100</code>.",
 
   // ---- pay asset picker ----

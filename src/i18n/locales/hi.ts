@@ -142,4 +142,11 @@ export const hi: Partial<Locale> = {
   "btn.refundAddr": "↩️ रिफ़ंड पता जोड़ें",
   "refund.prompt": "वैकल्पिक सुरक्षा: एक <b>{symbol}</b> पता भेजें ताकि इस ऑर्डर में कुछ गलत होने पर अपने आप रिफ़ंड हो जाए।",
   "refund.set": "✅ इस ऑर्डर के लिए रिफ़ंड पता सहेज लिया गया।",
+  "swap.receive": "आपको मिलेगा",
+  "swap.notset": "सेट नहीं",
+  "btn.flipPair": "🔁",
+  "btn.setAmount": "💵 राशि",
+  "btn.setAddress": "📍 पता",
+  "btn.getQuote": "⚡️ भाव पाएँ",
+  "swap.incomplete": "पहले राशि और प्राप्ति पता सेट करें।",
 };

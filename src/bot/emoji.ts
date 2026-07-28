@@ -199,6 +199,11 @@ export function assetIconId(assetId: string): string | undefined {
   return packEmojiId(`asset-${assetId.toLowerCase()}`);
 }
 
+/** HTML emoji for an asset in message text (pack emoji + unicode fallback). */
+export function assetEmojiHtml(assetId: string): string {
+  return e(assetEmojiChar(assetId), `asset-${assetId.toLowerCase()}`);
+}
+
 /** uSwap pack icon id for a network button. */
 export function networkIconId(chainId: string): string | undefined {
   return packEmojiId(`net-${chainId.toLowerCase()}`);
