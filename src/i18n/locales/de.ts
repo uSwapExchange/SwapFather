@@ -4,7 +4,7 @@ export const de: Partial<Locale> = {
   // ---- home ----
   "home.title": "<b>{brand}</b> — digitale Produkte mit Krypto kaufen",
   "home.body":
-    "Geschenkkarten, Telegram Stars & Premium, Discord Nitro, VPN-Zeit und Prepaid-Karten — bezahlt mit den Coins, die du schon hast.\n\n<i>Kein Konto. Keine Karte. Produkt wählen, eine Zahlung senden, fertig.</i>",
+    "Produkt wählen, mit deiner Krypto zahlen, in Minuten direkt hier geliefert. <i>Ohne Konto.</i>",
   "home.choose": "Was möchtest du kaufen?",
   "btn.orders": "🧾 Meine Bestellungen",
   "btn.language": "🌐 Sprache",
@@ -149,4 +149,6 @@ export const de: Partial<Locale> = {
   "btn.setAddress": "📍 Adresse",
   "btn.getQuote": "⚡️ Kurs holen",
   "swap.incomplete": "Lege zuerst Betrag und Empfangsadresse fest.",
+  "browse.aisleHint": "{count} Produkte — wähle eine Kategorie:",
+  "btn.allItems": "🛍 Alle ({count})",
 };

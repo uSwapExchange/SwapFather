@@ -58,6 +58,7 @@ interface FSession {
     | "near"
     | "xmr"
     | "editbrand"
+    | "editwelcome"
     | "editsupport"
     | null;
   draft?: FDraft;
@@ -203,6 +204,16 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           f.s.awaiting = null;
           if (id !== undefined && ownsTenant(f, id)) {
             updateTenant(id, { brand_name: text.slice(0, 48) });
+            await reloadTenant(id);
+          }
+          return showManage(f, id!);
+        }
+        case "editwelcome": {
+          const id = f.s.manageId;
+          f.s.awaiting = null;
+          if (id !== undefined && ownsTenant(f, id)) {
+            const value = text.trim().toLowerCase() === "reset" ? null : text.slice(0, 300);
+            updateTenant(id, { welcome_text: value });
             await reloadTenant(id);
           }
           return showManage(f, id!);
@@ -369,6 +380,14 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           f.s.awaiting = "editbrand";
           return show(f, {
             text: "✏️ Send the new brand name:",
+            keyboard: [[btn("‹ Back", `t:${a}`)]],
+          });
+        case "ew":
+          if (!ownsTenant(f, Number(a))) return;
+          f.s.manageId = Number(a);
+          f.s.awaiting = "editwelcome";
+          return show(f, {
+            text: "✏️ Send the welcome text your buyers see on the home screen (or send <code>reset</code> for the default):",
             keyboard: [[btn("‹ Back", `t:${a}`)]],
           });
         case "es":
@@ -702,7 +721,8 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
     const keyboard: Keyboard = [
       [btn(row.status === "active" ? "⏸ Pause" : "▶️ Resume", `p:${id}`, row.status === "active" ? "danger" : "success")],
       [btn("✏️ Brand", `eb:${id}`), btn("🗂 Catalog", `ec:${id}`)],
-      [btn("💬 Support", `es:${id}`), btn("💰 Earnings", `$:${id}`)],
+      [btn("📝 Welcome", `ew:${id}`), btn("💬 Support", `es:${id}`)],
+      [btn("💰 Earnings", `$:${id}`)],
       [btn("🗑 Remove", `d:${id}`, "danger")],
       [btn("‹ Back", "m")],
     ];

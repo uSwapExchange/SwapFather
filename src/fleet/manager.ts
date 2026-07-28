@@ -22,6 +22,7 @@ export function rowToTenant(row: TenantRow): Tenant {
     botToken: decryptSecret(row.bot_token_enc),
     ownerUserId: row.owner_user_id,
     brandName: row.brand_name,
+    welcomeText: row.welcome_text,
     supportHandle: row.support_handle ?? defaultSupportHandle(),
     families: row.families ? (JSON.parse(row.families) as string[]) : null,
     creatorCode: row.creator_code,

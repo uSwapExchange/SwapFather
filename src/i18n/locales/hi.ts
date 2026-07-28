@@ -4,7 +4,7 @@ export const hi: Partial<Locale> = {
   // ---- home ----
   "home.title": "<b>{brand}</b> — क्रिप्टो से डिजिटल चीज़ें खरीदें",
   "home.body":
-    "गिफ़्ट कार्ड, Telegram Stars और Premium, Discord Nitro, VPN टाइम और प्रीपेड कार्ड — उन्हीं कॉइन से जो आपके पास पहले से हैं।\n\n<i>न अकाउंट, न कार्ड। प्रोडक्ट चुनें, एक पेमेंट भेजें, हो गया।</i>",
+    "प्रोडक्ट चुनें, अपनी किसी भी क्रिप्टो से पेमेंट करें, मिनटों में यहीं डिलीवर। <i>बिना अकाउंट के।</i>",
   "home.choose": "क्या खरीदना चाहेंगे?",
   "btn.orders": "🧾 मेरे ऑर्डर",
   "btn.language": "🌐 भाषा",
@@ -149,4 +149,6 @@ export const hi: Partial<Locale> = {
   "btn.setAddress": "📍 पता",
   "btn.getQuote": "⚡️ भाव पाएँ",
   "swap.incomplete": "पहले राशि और प्राप्ति पता सेट करें।",
+  "browse.aisleHint": "{count} प्रोडक्ट — एक कैटेगरी चुनें:",
+  "btn.allItems": "🛍 सभी ({count})",
 };

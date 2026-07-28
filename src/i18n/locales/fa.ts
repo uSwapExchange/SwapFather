@@ -4,7 +4,7 @@ export const fa: Partial<Locale> = {
   // ---- home ----
   "home.title": "<b>{brand}</b> — خرید کالای دیجیتال با کریپتو",
   "home.body":
-    "گیفت کارت، Telegram Stars و Premium، Discord Nitro، اشتراک VPN و کارت‌های پیش‌پرداخت — با همان کوینی که همین الان داری.\n\n<i>بدون حساب، بدون کارت بانکی. محصول را انتخاب کن، یک پرداخت بفرست، تمام.</i>",
+    "محصول را انتخاب کنید، با هر کوینی که دارید بپردازید و طی چند دقیقه همین‌جا تحویل بگیرید. <i>بدون حساب.</i>",
   "home.choose": "چی می‌خوای بخری؟",
   "btn.orders": "🧾 سفارش‌های من",
   "btn.language": "🌐 زبان",
@@ -149,4 +149,6 @@ export const fa: Partial<Locale> = {
   "btn.setAddress": "📍 آدرس",
   "btn.getQuote": "⚡️ دریافت نرخ",
   "swap.incomplete": "ابتدا مقدار و آدرس دریافت را تنظیم کنید.",
+  "browse.aisleHint": "{count} محصول — یک دسته انتخاب کنید:",
+  "btn.allItems": "🛍 همه ({count})",
 };

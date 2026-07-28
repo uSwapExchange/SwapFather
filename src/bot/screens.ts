@@ -56,13 +56,12 @@ export function renderHome(
   families: Family[],
   brand: string,
   withSwap = false,
+  welcomeText?: string | null,
 ): Screen {
   const text = [
     t("home.title", { brand: esc(brand) }),
     "",
-    t("home.body"),
-    "",
-    `<b>${t("home.choose")}</b>`,
+    welcomeText ? esc(welcomeText) : t("home.body"),
   ].join("\n");
   const familyBtns = families.map((f) => {
     const icon = productIconId(f.id);
@@ -84,35 +83,70 @@ export function renderHome(
 
 const PAGE_SIZE = 24;
 
+export interface BrowseContext {
+  familyName?: string;
+  familyEmojiHtml?: string;
+  hideNav?: boolean;
+}
+
+/** Big sectioned levels open as a category chooser instead of a button wall. */
+export function browseUsesAisles(meta: LevelMeta, page: PageItem[]): boolean {
+  return (meta.categories?.length ?? 0) >= 2 && (Boolean(meta.pills) || page.length > 12);
+}
+
+function breadcrumb(ctx: BrowseContext, tail?: string): string {
+  const parts: string[] = [];
+  if (ctx.familyName) {
+    parts.push(`${ctx.familyEmojiHtml ? ctx.familyEmojiHtml + " " : ""}<b>${esc(ctx.familyName)}</b>`);
+  }
+  if (tail && tail !== ctx.familyName) parts.push(`<b>${esc(tail)}</b>`);
+  return parts.join(" › ");
+}
+
 export function renderBrowse(
   t: Translator,
   meta: LevelMeta,
   nav: NavLevel,
   page: PageItem[],
-  opts: { hideNav?: boolean } = {},
+  ctx: BrowseContext = {},
 ): Screen {
+  const aisleMode =
+    browseUsesAisles(meta, page) && !nav.category && !nav.showAll && !nav.query;
+
+  // ----- aisle screen: the level's categories as the whole keyboard -----
+  if (aisleMode) {
+    const cats = meta.categories ?? [];
+    const total =
+      cats.reduce((n, c) => n + (c.count ?? 0), 0) || page.length;
+    const lines = [
+      breadcrumb(ctx, nav.title ?? meta.title),
+      "",
+      t("browse.aisleHint", { count: total }),
+    ];
+    const catBtns = cats.map((c, i) => {
+      const glyph = categoryEmojiChar(c.name);
+      const label = `${glyph ? glyph + " " : ""}${c.name}${c.count ? ` (${c.count})` : ""}`;
+      return btn(label, `ct:${i}`);
+    });
+    const keyboard: Keyboard = [
+      ...grid(catBtns, 2),
+      [btn(t("btn.allItems", { count: total }), "ct:all")],
+    ];
+    if (meta.search === "server") keyboard.push([btn(t("btn.search"), "sr")]);
+    if (!ctx.hideNav) keyboard.push(navRow(t));
+    return { text: lines.join("\n"), keyboard };
+  }
+
+  // ----- items screen -----
   const lines: string[] = [];
-  const title = nav.title ?? meta.title ?? "";
-  lines.push(`<b>${esc(title)}</b>`);
+  const tail = nav.category ?? nav.title ?? meta.title ?? "";
+  lines.push(breadcrumb(ctx, tail) || `<b>${esc(tail)}</b>`);
   if (nav.query) lines.push(t("browse.results", { query: esc(nav.query) }));
   if (page.length === 0) {
     lines.push("", t("browse.noResults", { query: esc(nav.query ?? "") }));
   }
 
   const keyboard: Keyboard = [];
-
-  // Category pills (server-side filter). Known categories get a glyph;
-  // the active one is blue + marked.
-  if (meta.categories?.length && meta.pills) {
-    const pills = meta.categories.map((c, i) => {
-      const active = nav.category === c.id;
-      const glyph = categoryEmojiChar(c.name);
-      const name = glyph ? `${glyph} ${c.name}` : c.name;
-      return btn(active ? `• ${name}` : name, `ct:${i}`, active ? "primary" : undefined);
-    });
-    keyboard.push(...grid(pills, 3));
-  }
-
   const offset = nav.offset ?? 0;
   const shown = page.slice(offset, offset + PAGE_SIZE);
   // Brand icons on items only when they DIFFER within the page — a column of
@@ -146,12 +180,17 @@ export function renderBrowse(
     keyboard.push(row);
   }
 
-  if (meta.search === "server") {
-    const row = [btn(t("btn.search"), "sr")];
+  // Search lives on the aisle screen for aisle levels; inside a category the
+  // list is already short. Keep it for flat levels and the "All" view.
+  const showSearch =
+    meta.search === "server" && (!browseUsesAisles(meta, page) || nav.showAll || nav.query);
+  if (showSearch || nav.query) {
+    const row: Btn[] = [];
+    if (showSearch) row.push(btn(t("btn.search"), "sr"));
     if (nav.query) row.push(btn(t("btn.clearSearch"), "srx", "danger"));
-    keyboard.push(row);
+    if (row.length) keyboard.push(row);
   }
-  if (!opts.hideNav) keyboard.push(navRow(t));
+  if (!ctx.hideNav) keyboard.push(navRow(t));
   return { text: lines.join("\n"), keyboard };
 }
 

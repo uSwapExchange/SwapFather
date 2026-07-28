@@ -35,7 +35,7 @@ import { loadSession, persistSession, resetSession } from "./session.ts";
 import * as screens from "./screens.ts";
 import type { Screen } from "./screens.ts";
 import { markup, stripIcons } from "./keyboard.ts";
-import { customEmojiEnabled, disableCustomEmoji, stripTgEmoji } from "./emoji.ts";
+import { customEmojiEnabled, disableCustomEmoji, productEmoji, stripTgEmoji } from "./emoji.ts";
 import { uswap, UswapApiError } from "../uswap/client.ts";
 import { esc, rawToHuman } from "../lib/format.ts";
 import { logger } from "../lib/logger.ts";
@@ -144,7 +144,13 @@ async function showHome(u: Uctx, opts: { newMessage?: boolean } = {}): Promise<v
   u.s.screen = "home";
   await showScreen(
     u,
-    screens.renderHome(u.t, families, u.tenant.brandName, sellsSwaps(u.tenant)),
+    screens.renderHome(
+      u.t,
+      families,
+      u.tenant.brandName,
+      sellsSwaps(u.tenant),
+      u.tenant.welcomeText,
+    ),
     opts,
   );
 }
@@ -157,9 +163,15 @@ function atNicheRoot(u: Uctx): boolean {
 async function showBrowse(u: Uctx): Promise<void> {
   const nav = flow.currentNav(u.s);
   if (!nav || !u.s.meta || !u.s.page) return showHome(u);
+  const families = await getFamilies(u.tenant.families);
+  const family = families.find((f) => f.id === nav.asset);
   await showScreen(
     u,
-    screens.renderBrowse(u.t, u.s.meta, nav, u.s.page, { hideNav: atNicheRoot(u) }),
+    screens.renderBrowse(u.t, u.s.meta, nav, u.s.page, {
+      hideNav: atNicheRoot(u) && !nav.category && !nav.showAll,
+      familyName: family?.name,
+      familyEmojiHtml: family ? productEmoji(family.id) : undefined,
+    }),
   );
 }
 
@@ -394,6 +406,19 @@ async function goBack(u: Uctx) {
       s.screen = "swcard";
       return showCurrent(u);
     case "browse": {
+      const current = flow.currentNav(s);
+      if (
+        current &&
+        (current.category || current.showAll) &&
+        s.meta &&
+        s.page &&
+        screens.browseUsesAisles(s.meta, s.page)
+      ) {
+        current.category = undefined;
+        current.showAll = false;
+        current.query = undefined;
+        return showBrowse(u);
+      }
       s.nav.pop();
       const nav = flow.currentNav(s);
       if (!nav) return showHome(u);
@@ -673,9 +698,15 @@ function makeHandleCallback(tenant: Tenant, runUi: RunUi) {
         return showBrowse(u);
       case "ct": {
         const nav = flow.currentNav(s);
-        const catId = nav?.categoryIds?.[Number(arg)];
         if (!nav) return showBrowse(u);
-        nav.category = nav.category === catId ? undefined : catId;
+        if (arg === "all") {
+          nav.showAll = true;
+          nav.category = undefined;
+        } else {
+          const catId = nav.categoryIds?.[Number(arg)];
+          nav.showAll = false;
+          nav.category = nav.category === catId ? undefined : catId;
+        }
         await flow.refreshLevel(s);
         return showBrowse(u);
       }

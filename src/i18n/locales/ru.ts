@@ -4,7 +4,7 @@ export const ru: Partial<Locale> = {
   // ---- home ----
   "home.title": "<b>{brand}</b> — покупайте цифровые товары за крипту",
   "home.body":
-    "Подарочные карты, Telegram Stars и Premium, Discord Nitro, VPN и предоплаченные карты — за монеты, которые у вас уже есть.\n\n<i>Без аккаунта. Без карты. Выберите товар, отправьте один платёж — готово.</i>",
+    "Выберите товар, оплатите любой монетой — доставка прямо сюда за минуты. <i>Без аккаунта.</i>",
   "home.choose": "Что хотите купить?",
   "btn.orders": "🧾 Мои заказы",
   "btn.language": "🌐 Язык",
@@ -149,4 +149,6 @@ export const ru: Partial<Locale> = {
   "btn.setAddress": "📍 Адрес",
   "btn.getQuote": "⚡️ Получить курс",
   "swap.incomplete": "Сначала укажите сумму и адрес получения.",
+  "browse.aisleHint": "{count} товаров — выберите категорию:",
+  "btn.allItems": "🛍 Все ({count})",
 };

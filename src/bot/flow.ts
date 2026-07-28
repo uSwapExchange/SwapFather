@@ -126,7 +126,11 @@ function toPageItems(res: LevelResponse): PageItem[] {
   return res.items.map((it): PageItem => {
     if (it.kind === "leaf") {
       const c = it.item.chain;
-      const label = c.subtitle ? `${c.name} · ${c.subtitle}` : c.name;
+      // Names like "1 Month" are meaningless without their group — borrow it
+      // ("Boosts · 1 Month") so buttons never orphan their context.
+      const needsContext = /^\d/.test(c.name) && c.parent_group_name;
+      const name = needsContext ? `${c.parent_group_name} · ${c.name}` : c.name;
+      const label = c.subtitle ? `${name} · ${c.subtitle}` : name;
       return { k: "l", item: slimLeaf(it.item), label, icon: leafPackKey(it.item.asset_v1) };
     }
     const n = it.node;

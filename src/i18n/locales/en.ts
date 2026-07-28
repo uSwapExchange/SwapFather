@@ -13,7 +13,7 @@ export const en = {
   // ---- home ----
   "home.title": "<b>{brand}</b> — buy digital stuff with crypto",
   "home.body":
-    "Gift cards, Telegram Stars & Premium, Discord Nitro, VPN time and prepaid cards — paid with the coins you already hold.\n\n<i>No account. No card. Pick a product, send one payment, done.</i>",
+    "Pick a product, pay with any coin you hold, delivered right here in minutes. <i>No account needed.</i>",
   "home.choose": "What would you like to buy?",
   "btn.orders": "🧾 My orders",
   "btn.language": "🌐 Language",
@@ -37,6 +37,8 @@ export const en = {
   "browse.stale":
     "This menu is out of date — use the latest message or send /start.",
   "browse.soldout": "sold out",
+  "browse.aisleHint": "{count} products — pick a category:",
+  "btn.allItems": "🛍 All ({count})",
 
   // ---- product configure ----
   "amount.title": "<b>{product}</b>",

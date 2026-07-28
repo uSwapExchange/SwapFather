@@ -22,6 +22,8 @@ export interface NavLevel {
   pageNo?: number;
   category?: string;
   categoryIds?: string[];
+  /** User chose "All" on an aisle screen (bypasses the category chooser). */
+  showAll?: boolean;
   query?: string;
 }
 

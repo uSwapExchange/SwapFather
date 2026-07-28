@@ -4,7 +4,7 @@ export const zh: Partial<Locale> = {
   // ---- home ----
   "home.title": "<b>{brand}</b> — 用加密货币购买数字商品",
   "home.body":
-    "礼品卡、Telegram Stars 和 Premium、Discord Nitro、VPN 时长、预付卡 — 用你手里的币直接付款。\n\n<i>无需账号，无需银行卡。选好商品，付一笔款，搞定。</i>",
+    "选好商品，用你手里的币付款，几分钟内在这里交付。<i>无需账户。</i>",
   "home.choose": "想买点什么？",
   "btn.orders": "🧾 我的订单",
   "btn.language": "🌐 语言",
@@ -149,4 +149,6 @@ export const zh: Partial<Locale> = {
   "btn.setAddress": "📍 地址",
   "btn.getQuote": "⚡️ 获取报价",
   "swap.incomplete": "请先设置金额和收款地址。",
+  "browse.aisleHint": "{count} 件商品——选择一个分类：",
+  "btn.allItems": "🛍 全部（{count}）",
 };

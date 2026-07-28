@@ -16,6 +16,8 @@ export interface Tenant {
   botToken: string;
   ownerUserId: number | null;
   brandName: string;
+  /** Optional custom home-screen welcome line (plain text). */
+  welcomeText: string | null;
   supportHandle: string | null;
   /** Enabled catalog family ids; null = the full digital catalog. */
   families: string[] | null;
@@ -53,6 +55,7 @@ export function flagshipTenant(botId: number, botUsername: string, botToken: str
     botToken,
     ownerUserId: null,
     brandName: process.env.BRAND_NAME ?? "Best B4U",
+    welcomeText: process.env.WELCOME_TEXT ?? null,
     supportHandle: defaultSupportHandle(),
     families: null,
     creatorCode: process.env.CREATOR_CODE ?? null,

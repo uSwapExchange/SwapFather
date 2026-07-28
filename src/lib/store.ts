@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   bot_token_enc TEXT NOT NULL,
   owner_user_id INTEGER NOT NULL,
   brand_name TEXT NOT NULL,
+  welcome_text TEXT,
   support_handle TEXT,
   families TEXT,
   creator_code TEXT,
@@ -96,6 +97,7 @@ for (const ddl of [
   "ALTER TABLE tenants ADD COLUMN mode TEXT NOT NULL DEFAULT 'shop'",
   "ALTER TABLE orders ADD COLUMN pay_asset_v1 TEXT",
   "ALTER TABLE orders ADD COLUMN refund_set INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE tenants ADD COLUMN welcome_text TEXT",
 ]) {
   try {
     db.exec(ddl);
@@ -330,6 +332,7 @@ export interface TenantRow {
   bot_token_enc: string;
   owner_user_id: number;
   brand_name: string;
+  welcome_text: string | null;
   support_handle: string | null;
   families: string | null;
   creator_code: string | null;
@@ -406,6 +409,7 @@ export function updateTenant(
   id: number,
   patch: Partial<{
     brand_name: string;
+    welcome_text: string | null;
     support_handle: string | null;
     families: string | null;
     creator_code: string | null;
