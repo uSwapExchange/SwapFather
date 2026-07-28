@@ -236,6 +236,14 @@ export function renderDest(
 
 // ---------- swap ----------
 
+/** Min-deposit line; drops the fiat parenthetical when the API returns 0. */
+function minDepositLine(t: Translator, min: string, usdVal?: string): string {
+  const hasUsd = usdVal !== undefined && Number(usdVal) > 0;
+  const raw = t("swap.minDeposit", { min, usd: hasUsd ? `$${usdVal}` : "@@" });
+  return hasUsd ? raw : raw.replace(/\s*[（(]≈ @@[)）]/, "");
+}
+
+
 /**
  * The swap hub: a uSwapZero-style config card. Pair on top with a flip
  * button, amount + address filled in any order, quote unlocks when ready.
@@ -266,13 +274,7 @@ export function renderSwapCard(
     `📍 ${t("btn.setAddress").replace("📍 ", "")}:  ${addrDisplay}`,
   ];
   if (draft.payMinHuman) {
-    lines.push(
-      "",
-      t("swap.minDeposit", {
-        min: `${draft.payMinHuman} ${esc(sendSym)}`,
-        usd: draft.payMinUsd ? `$${draft.payMinUsd}` : "",
-      }),
-    );
+    lines.push("", minDepositLine(t, `${draft.payMinHuman} ${esc(sendSym)}`, draft.payMinUsd));
   }
   const ready = Boolean(draft.amountHuman && draft.destination);
   const keyboard: Keyboard = [
@@ -358,10 +360,7 @@ export function renderSwapAmount(t: Translator, draft: Draft): Screen {
   if (draft.payMinHuman) {
     lines.push(
       "",
-      t("swap.minDeposit", {
-        min: `${draft.payMinHuman} ${esc(draft.paySymbol ?? "")}`,
-        usd: draft.payMinUsd ? `$${draft.payMinUsd}` : "",
-      }),
+      minDepositLine(t, `${draft.payMinHuman} ${esc(draft.paySymbol ?? "")}`, draft.payMinUsd),
     );
   }
   return {
