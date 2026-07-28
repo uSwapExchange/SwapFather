@@ -60,10 +60,15 @@ interface FSession {
     | "editbrand"
     | "editwelcome"
     | "editsupport"
+    | "pcode"
+    | "pnear"
+    | "pxmr"
     | null;
   draft?: FDraft;
   manageId?: number;
   editFamilies?: string[];
+  /** Payout setup bound to an existing tenant (manage screen). */
+  payout?: { code?: string; near?: string };
 }
 
 interface Fctx {
@@ -207,6 +212,28 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
             await reloadTenant(id);
           }
           return showManage(f, id!);
+        }
+        case "pcode": {
+          const code = text.toLowerCase().replace(/^@/, "");
+          if (!/^[a-z0-9_-]{3,32}$/.test(code)) {
+            await ctx.reply("Codes are 3–32 chars: a-z, 0-9, - or _. Try again:");
+            return;
+          }
+          f.s.payout = { ...(f.s.payout ?? {}), code };
+          f.s.awaiting = "pnear";
+          return show(f, nearPrompt(`t:${f.s.manageId}`));
+        }
+        case "pnear": {
+          f.s.payout = { ...(f.s.payout ?? {}), near: text.trim() };
+          f.s.awaiting = "pxmr";
+          return show(f, {
+            text: "Optional: send a <b>Monero (XMR) address</b> for payouts too, or skip.",
+            keyboard: [[btn("⏭ Skip", `px:${f.s.manageId}`)]],
+          });
+        }
+        case "pxmr": {
+          f.s.awaiting = null;
+          return finishPayout(f, text.trim());
         }
         case "editwelcome": {
           const id = f.s.manageId;
@@ -382,6 +409,43 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
             text: "✏️ Send the new brand name:",
             keyboard: [[btn("‹ Back", `t:${a}`)]],
           });
+        case "ps2": {
+          const id = Number(a);
+          if (!ownsTenant(f, id)) return;
+          f.s.manageId = id;
+          f.s.payout = {};
+          f.s.awaiting = "pcode";
+          const row = getTenantRow(id)!;
+          const def = row.bot_username.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 32);
+          return show(f, {
+            text: [
+              "💰 <b>Set up payouts</b>",
+              "",
+              "You earn a share of every sale your bot makes, paid straight to your own wallet.",
+              "",
+              `First, pick your <b>creator code</b> (identifies your earnings).\nDefault: <code>${esc(def)}</code>`,
+            ].join("\n"),
+            keyboard: [
+              [btn(`Use "${def}"`, `pd:${id}`, "primary")],
+              [btn("‹ Back", `t:${id}`)],
+            ],
+          });
+        }
+        case "pd": {
+          const id = Number(a);
+          if (!ownsTenant(f, id)) return;
+          const row = getTenantRow(id)!;
+          f.s.manageId = id;
+          f.s.payout = {
+            code: row.bot_username.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 32),
+          };
+          f.s.awaiting = "pnear";
+          return show(f, nearPrompt(`t:${id}`));
+        }
+        case "px": {
+          f.s.awaiting = null;
+          return finishPayout(f, "");
+        }
         case "ew":
           if (!ownsTenant(f, Number(a))) return;
           f.s.manageId = Number(a);
@@ -532,6 +596,67 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
         [btn("‹ Cancel", "h", "danger")],
       ],
     });
+  }
+
+  function nearPrompt(backTo: string): FScreen {
+    return {
+      text: [
+        "💰 <b>Payout account</b>",
+        "",
+        "Send the <b>NEAR account</b> that should receive your earnings (e.g. <code>yourname.near</code>).",
+        "",
+        "🆕 <b>Don't have one?</b> Takes ~2 minutes:",
+        "1. Go to near.com and tap <b>Create Account</b>",
+        "2. Sign up with email or a passphrase",
+        "3. Your account name (like <code>yourname.near</code>) IS your payout address — send it here.",
+      ].join("\n"),
+      keyboard: [
+        [{ text: "🌈 Create a NEAR account", url: "https://near.com" }],
+        [btn("‹ Back", backTo)],
+      ],
+    };
+  }
+
+  /** Register (or re-register) payouts for an existing tenant. */
+  async function finishPayout(f: Fctx, xmr: string) {
+    const id = f.s.manageId;
+    const p = f.s.payout;
+    f.s.payout = undefined;
+    if (id === undefined || !ownsTenant(f, id) || !p?.code || !p.near) {
+      return id === undefined ? show(f, home()) : showManage(f, id);
+    }
+    const row = getTenantRow(id)!;
+    try {
+      const reg = await registerAffiliate({
+        username: p.code,
+        displayName: row.brand_name,
+        nearAccount: p.near,
+        xmrAddress: xmr || undefined,
+      });
+      updateTenant(id, {
+        creator_code: p.code,
+        affiliate_token_enc: reg.token ? encryptSecret(reg.token) : null,
+      });
+      await reloadTenant(id);
+      return show(f, {
+        text: [
+          "✅ <b>Payouts are live.</b>",
+          "",
+          `Creator code: <code>${esc(p.code)}</code>`,
+          "You now earn a share of every sale this bot makes, paid to your wallet automatically.",
+        ].join("\n"),
+        keyboard: [[btn("‹ Back to bot", `t:${id}`)]],
+      });
+    } catch (err) {
+      const msg = err instanceof AffiliateError ? err.message : "registration failed";
+      return show(f, {
+        text: `⚠️ Payout setup failed: ${esc(msg)}\n\nTry a different creator code, or set it up later.`,
+        keyboard: [
+          [btn("🔁 Try again", `ps2:${id}`)],
+          [btn("‹ Back", `t:${id}`)],
+        ],
+      });
+    }
   }
 
   async function showModeStep(f: Fctx) {
@@ -723,7 +848,9 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       [btn(row.status === "active" ? "⏸ Pause" : "▶️ Resume", `p:${id}`, row.status === "active" ? "danger" : "success")],
       [btn("✏️ Brand", `eb:${id}`), btn("🗂 Catalog", `ec:${id}`)],
       [btn("📝 Welcome", `ew:${id}`), btn("💬 Support", `es:${id}`)],
-      [btn("💰 Earnings", `$:${id}`)],
+      row.creator_code
+        ? [btn("💰 Earnings", `$:${id}`), btn("✏️ Payout wallets", `ps2:${id}`)]
+        : [btn("💰 Set up payouts — earn on every sale", `ps2:${id}`, "success")],
       [btn("🗑 Remove", `d:${id}`, "danger")],
       [btn("‹ Back", "m")],
     ];
