@@ -59,6 +59,9 @@ const PRODUCT_PACK_KEY: Record<string, string> = {
   discord: "prod-discord",
   mullvad: "prod-mullvad",
   "prepaid-card": "prod-prepaid-card",
+  // family id (home buttons) and asset family (asset_v1) both resolve here
+  "tf2-keys": "prod-tf2-key",
+  tf2: "prod-tf2-key",
 };
 
 const PRODUCT_UNICODE: Record<string, string> = {
@@ -67,7 +70,80 @@ const PRODUCT_UNICODE: Record<string, string> = {
   discord: "🎮",
   mullvad: "🛡",
   "prepaid-card": "💳",
+  "tf2-keys": "🔑",
+  tf2: "🔑",
 };
+
+/**
+ * Per-PRODUCT pack key resolver — finer than the family glyph, so Stars,
+ * Premium, Boosts, Nitro, TF2 keys etc. each carry their own brand emoji.
+ */
+export function leafPackKey(assetV1: string): string | undefined {
+  const [, family = "", provider = "", sku = ""] = assetV1.split(":");
+  if (family === "telegram") {
+    if (provider === "fragment") {
+      if (sku.startsWith("premium")) return "prod-tg-premium";
+      if (sku.startsWith("stars")) return "prod-tg-stars";
+      if (sku.includes("boost")) return "prod-tg-boost";
+      if (sku.startsWith("ads")) return "asset-gram";
+    }
+    return "prod-telegram";
+  }
+  if (family === "discord") {
+    if (sku.includes("boost")) return "prod-dc-boost";
+    if (sku.startsWith("nitro") || sku.startsWith("promo")) return "prod-nitro";
+    return "prod-discord";
+  }
+  return PRODUCT_PACK_KEY[family];
+}
+
+/** Custom-emoji button icon id for a product, when the pack has one. */
+export function leafIconId(assetV1: string): string | undefined {
+  const key = leafPackKey(assetV1);
+  return key ? packEmojiId(key) : undefined;
+}
+
+const PACK_KEY_UNICODE: Record<string, string> = {
+  "prod-tg-premium": "🌟",
+  "prod-tg-stars": "⭐️",
+  "prod-tg-boost": "⚡️",
+  "prod-nitro": "🚀",
+  "prod-dc-boost": "⚡️",
+  "prod-tf2-key": "🔑",
+  "asset-gram": "✈️",
+};
+
+/** HTML emoji for a specific product (finer than the family glyph). */
+export function leafEmoji(assetV1: string): string {
+  const key = leafPackKey(assetV1);
+  const family = assetV1.split(":")[1] ?? "";
+  const unicode = (key && PACK_KEY_UNICODE[key]) ?? PRODUCT_UNICODE[family] ?? "🛍";
+  return e(unicode, key);
+}
+
+/** Unicode prefix for known catalog category pills. */
+const CATEGORY_UNICODE: Record<string, string> = {
+  "food & drink": "🍔",
+  shopping: "🛒",
+  entertainment: "🎬",
+  gaming: "🎮",
+  travel: "🌎",
+  tech: "💻",
+  "home & garden": "🏡",
+  "beauty & wellness": "💄",
+  "sports & outdoors": "⚽️",
+  other: "🎫",
+  premium: "🌟",
+  stars: "⭐️",
+  rentals: "📱",
+  nitro: "🚀",
+  boosts: "⚡️",
+  accounts: "👤",
+};
+
+export function categoryEmojiChar(name: string): string | undefined {
+  return CATEGORY_UNICODE[name.toLowerCase()];
+}
 
 /** Plain unicode glyph (safe for button text). */
 export function productEmojiChar(assetId: string): string {

@@ -13,7 +13,10 @@ import { esc, niceCrypto, presetAmounts, rawToHuman, usd } from "../lib/format.t
 import {
   assetEmojiChar,
   assetIconId,
+  categoryEmojiChar,
+  leafEmoji,
   networkIconId,
+  packEmojiId,
   productEmoji,
   productEmojiChar,
   productIconId,
@@ -97,33 +100,47 @@ export function renderBrowse(
 
   const keyboard: Keyboard = [];
 
-  // Category pills (server-side filter). The active one is blue + marked.
+  // Category pills (server-side filter). Known categories get a glyph;
+  // the active one is blue + marked.
   if (meta.categories?.length && meta.pills) {
     const pills = meta.categories.map((c, i) => {
       const active = nav.category === c.id;
-      return btn(active ? `• ${c.name}` : c.name, `ct:${i}`, active ? "primary" : undefined);
+      const glyph = categoryEmojiChar(c.name);
+      const name = glyph ? `${glyph} ${c.name}` : c.name;
+      return btn(active ? `• ${name}` : name, `ct:${i}`, active ? "primary" : undefined);
     });
     keyboard.push(...grid(pills, 3));
   }
 
   const offset = nav.offset ?? 0;
   const shown = page.slice(offset, offset + PAGE_SIZE);
+  // Brand icons on items only when they DIFFER within the page — a column of
+  // 24 identical gift-card glyphs is noise, but Stars/Premium/Boosts side by
+  // side deserve their own marks.
+  const distinctIcons = new Set(shown.map((it) => it.icon).filter(Boolean));
+  const useIcons = distinctIcons.size >= 2;
   const itemBtns = shown.map((it, i) => {
     const oos = it.k === "d" ? it.oos : it.item.chain.out_of_stock;
-    const label = oos ? `${it.label} — ${t("browse.soldout")}` : it.label;
+    const label = oos ? `🔴 ${it.label} — ${t("browse.soldout")}` : it.label;
+    const iconId = useIcons && it.icon ? packEmojiId(it.icon) : undefined;
     // Callback carries the ABSOLUTE index into the fetched page.
-    return btn(label, `i:${offset + i}`);
+    return btn(label, `i:${offset + i}`, undefined, iconId);
   });
   // One per row keeps long labels (brand · $range) readable.
   keyboard.push(...grid(itemBtns, itemBtns.length > 12 ? 2 : 1));
 
-  // Pagination (local slices + server cursor, see flow.pageNext)
+  // Pagination (local slices + server cursor, see flow.pageNext).
+  // When the whole level fits one server page the total is known: "2/4".
   const hasPrev = offset > 0 || nav.cursorStack.length > 1;
   const hasNext = offset + PAGE_SIZE < page.length || Boolean(nav.nextCursor);
   if (hasPrev || hasNext) {
+    const totalKnown = nav.cursorStack.length <= 1 && !nav.nextCursor;
+    const pageLabel = totalKnown
+      ? `${nav.pageNo ?? 1}/${Math.max(1, Math.ceil(page.length / PAGE_SIZE))}`
+      : t("browse.page", { page: nav.pageNo ?? 1 });
     const row: Btn[] = [];
     if (hasPrev) row.push(btn(t("btn.prev"), "pg:p"));
-    row.push(btn(t("browse.page", { page: nav.pageNo ?? 1 }), "noop"));
+    row.push(btn(pageLabel, "noop"));
     if (hasNext) row.push(btn(t("btn.next"), "pg:n"));
     keyboard.push(row);
   }
@@ -153,7 +170,7 @@ export function renderAmount(
   const isUsd = unit === "USD";
 
   const lines: string[] = [
-    `${productEmoji(familyOf(draft))} ${t("amount.title", { product: esc(draft.productLabel) })}`,
+    `${leafEmoji(draft.leaf.asset_v1)} ${t("amount.title", { product: esc(draft.productLabel) })}`,
   ];
   if (c.subtitle) lines.push(`<i>${esc(c.subtitle)}</i>`);
   if (c.unit_price_usd_buy) {
@@ -199,7 +216,7 @@ export function renderDest(
   const prompt = draft.leaf.chain.address_prompt ?? "";
   const isTgUsername = /telegram username/i.test(prompt);
   const lines = [
-    t("amount.title", { product: esc(draft.productLabel) }),
+    `${leafEmoji(draft.leaf.asset_v1)} ${t("amount.title", { product: esc(draft.productLabel) })}`,
     "",
     isTgUsername
       ? t("dest.prompt.telegram_username")
@@ -356,7 +373,7 @@ function familyOf(draft: Draft): string {
 
 function summaryLine(draft: Draft): string {
   if (draft.swap) return `🔄 <b>${esc(draft.productLabel)}</b>`;
-  return `${productEmoji(familyOf(draft))} <b>${esc(formatProductAmount(draft))}</b>`;
+  return `${leafEmoji(draft.leaf.asset_v1)} <b>${esc(formatProductAmount(draft))}</b>`;
 }
 
 /** "Amazon Gift Card $50", "Telegram Stars × 50", "Mullvad VPN — 3 Months" */

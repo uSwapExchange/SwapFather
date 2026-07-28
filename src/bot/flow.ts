@@ -24,6 +24,7 @@ import {
 import type { NavLevel, PageItem, PayAssetChoice, Session } from "./session.ts";
 import type { Tenant } from "../tenant.ts";
 import { humanToRaw, rawToHuman } from "../lib/format.ts";
+import { leafPackKey } from "./emoji.ts";
 import { logger } from "../lib/logger.ts";
 
 // ---------- referral attribution ----------
@@ -125,7 +126,7 @@ function toPageItems(res: LevelResponse): PageItem[] {
     if (it.kind === "leaf") {
       const c = it.item.chain;
       const label = c.subtitle ? `${c.name} · ${c.subtitle}` : c.name;
-      return { k: "l", item: slimLeaf(it.item), label };
+      return { k: "l", item: slimLeaf(it.item), label, icon: leafPackKey(it.item.asset_v1) };
     }
     const n = it.node;
     // A drill with exactly one leaf child IS that product — treat it as a
@@ -141,6 +142,7 @@ function toPageItems(res: LevelResponse): PageItem[] {
       label,
       onlyItem: single ? slimLeaf(single) : undefined,
       oos: n.out_of_stock,
+      icon: single ? leafPackKey(single.asset_v1) : undefined,
     };
   });
 }

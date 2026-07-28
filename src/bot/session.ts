@@ -26,13 +26,14 @@ export interface NavLevel {
 }
 
 export type PageItem =
-  | { k: "l"; item: LeafItem; label: string }
+  | { k: "l"; item: LeafItem; label: string; icon?: string }
   | {
       k: "d";
       segment: LevelSegment;
       label: string;
       onlyItem?: LeafItem;
       oos?: boolean;
+      icon?: string;
     };
 
 export interface PayAssetChoice {

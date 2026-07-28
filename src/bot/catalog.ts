@@ -19,7 +19,7 @@ export interface Family {
 }
 
 const EXTRA_FAMILY_IDS = new Set(["prepaid-card"]);
-const FAMILY_ORDER = ["gift-card", "telegram", "discord", "prepaid-card", "mullvad"];
+const FAMILY_ORDER = ["gift-card", "telegram", "discord", "prepaid-card", "mullvad", "tf2-keys"];
 
 let cachedFamilies: Family[] | null = null;
 let cachedAt = 0;
