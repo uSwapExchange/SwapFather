@@ -116,7 +116,12 @@ async function showScreen(u: Uctx, screen: Screen, opts: { newMessage?: boolean 
 }
 
 function isCustomEmojiRejection(msg: string): boolean {
-  return /custom.?emoji|emoji.?id|button.*icon|icon.*button/i.test(msg);
+  // Telegram rejects custom emoji from non-entitled bots (owner without
+  // Premium) as plain ENTITY_TEXT_INVALID / *_EMOJI_* 400s — treat any of
+  // these as "this bot can't do custom emoji" and degrade to unicode.
+  return /custom.?emoji|emoji.?id|ENTITY_TEXT_INVALID|ENTITY_BOUNDS|DOCUMENT_INVALID|button.*icon|icon.*button/i.test(
+    msg,
+  );
 }
 
 async function showHome(u: Uctx, opts: { newMessage?: boolean } = {}): Promise<void> {
