@@ -715,6 +715,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       `Type: ${mode === "shop" ? "🛍 Shop" : mode === "swap" ? "🔄 Swap" : "🛍 + 🔄 Both"}`,
       ...(mode === "swap" ? [] : [`Catalog: ${families ? esc(families.join(", ")) : "Everything"}`]),
       `Support: ${esc(row.support_handle ?? "@maintenance")}`,
+      `Welcome: ${row.welcome_text ? "✏️ custom" : "default"}`,
       `Payouts: ${row.creator_code ? `✅ <code>${esc(row.creator_code)}</code>` : "not set up"}`,
       `Orders: ${orders.total} (${orders.completed} delivered)`,
     ];

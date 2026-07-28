@@ -165,14 +165,16 @@ async function showBrowse(u: Uctx): Promise<void> {
   if (!nav || !u.s.meta || !u.s.page) return showHome(u);
   const families = await getFamilies(u.tenant.families);
   const family = families.find((f) => f.id === nav.asset);
-  await showScreen(
-    u,
-    screens.renderBrowse(u.t, u.s.meta, nav, u.s.page, {
-      hideNav: atNicheRoot(u) && !nav.category && !nav.showAll,
-      familyName: family?.name,
-      familyEmojiHtml: family ? productEmoji(family.id) : undefined,
-    }),
-  );
+  const nicheRoot = atNicheRoot(u) && !nav.category && !nav.showAll;
+  const scr = screens.renderBrowse(u.t, u.s.meta, nav, u.s.page, {
+    hideNav: nicheRoot,
+    familyName: family?.name,
+    familyEmojiHtml: family ? productEmoji(family.id) : undefined,
+  });
+  if (nicheRoot && u.tenant.welcomeText) {
+    scr.text = `${esc(u.tenant.welcomeText)}\n\n${scr.text}`;
+  }
+  await showScreen(u, scr);
 }
 
 async function showCurrent(u: Uctx): Promise<void> {
@@ -180,12 +182,16 @@ async function showCurrent(u: Uctx): Promise<void> {
   switch (s.screen) {
     case "browse":
       return showBrowse(u);
-    case "swcard":
+    case "swcard": {
       await flow.loadPayMinDeposit(s);
-      return showScreen(
-        u,
-        screens.renderSwapCard(u.t, s.draft!, { hideNav: !sellsProducts(u.tenant) }),
-      );
+      const scr = screens.renderSwapCard(u.t, s.draft!, {
+        hideNav: !sellsProducts(u.tenant),
+      });
+      if (!sellsProducts(u.tenant) && u.tenant.welcomeText) {
+        scr.text = `${esc(u.tenant.welcomeText)}\n\n${scr.text}`;
+      }
+      return showScreen(u, scr);
+    }
     case "swto":
       return showScreen(
         u,
@@ -203,15 +209,16 @@ async function showCurrent(u: Uctx): Promise<void> {
       s.awaiting = "swamount";
       await flow.loadPayMinDeposit(s);
       return showScreen(u, screens.renderSwapAmount(u.t, s.draft!));
-    case "amount":
+    case "amount": {
       // Arm free-text input: presets are one tap, but typing "75" works too.
       s.awaiting = "amount";
-      return showScreen(
-        u,
-        screens.renderAmount(u.t, s.draft!, {
-          hideNav: atNicheRoot(u) && s.page?.length === 1,
-        }),
-      );
+      const nicheRoot = atNicheRoot(u) && s.page?.length === 1;
+      const scr = screens.renderAmount(u.t, s.draft!, { hideNav: nicheRoot });
+      if (nicheRoot && u.tenant.welcomeText) {
+        scr.text = `${esc(u.tenant.welcomeText)}\n\n${scr.text}`;
+      }
+      return showScreen(u, scr);
+    }
     case "dest":
       s.awaiting = "dest";
       return showScreen(u, screens.renderDest(u.t, s.draft!, u.ctx.from?.username));

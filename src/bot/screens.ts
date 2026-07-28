@@ -118,8 +118,10 @@ export function renderBrowse(
     const cats = meta.categories ?? [];
     const total =
       cats.reduce((n, c) => n + (c.count ?? 0), 0) || page.length;
+    // No title tail here — "🎁 Gift Cards › Select Brand" reads clunky when
+    // the screen itself is the category chooser.
     const lines = [
-      breadcrumb(ctx, nav.title ?? meta.title),
+      breadcrumb(ctx) || `<b>${esc(nav.title ?? meta.title ?? "")}</b>`,
       "",
       t("browse.aisleHint", { count: total }),
     ];
