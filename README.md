@@ -1,8 +1,10 @@
-# Best B4U
+# SwapFather
 
 Telegram commerce on the [uSwap](https://uswap.net) engine.
 
-Run **a shop** (gift cards, Telegram Stars & Premium, Discord Nitro, Mullvad VPN, TF2 keys, prepaid cards), **a swap service** (any coin → any coin, 50+ currencies), or **both** — and optionally let anyone mint their own branded copy of it in under a minute.
+Run **a shop** (gift cards, Telegram Stars & Premium, Discord Nitro, Mullvad VPN, TF2 keys, prepaid cards), **a swap service** (any coin → any coin, 50+ currencies), or **both** — and let anyone mint their own branded copy of it in under a minute.
+
+Live: [@SwapFather_bot](https://t.me/SwapFather_bot) mints the bots · [@BestB4UBot](https://t.me/BestB4UBot) is one running shop.
 
 No accounts, no KYC, no card on file: pick a product, send one crypto payment, get it delivered in the chat.
 

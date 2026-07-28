@@ -1,7 +1,7 @@
 {
-  "name": "best-b4u",
+  "name": "swapfather",
   "version": "0.1.0",
-  "description": "Best B4U — a Telegram bot for buying digital products (gift cards, Telegram Stars & Premium, Discord Nitro, prepaid cards and more) with crypto, powered by the uSwap Partner API.",
+  "description": "SwapFather — Telegram commerce on the uSwap engine: sell digital products for crypto, run a swap service, or host a fleet of branded bots.",
   "license": "MIT",
   "type": "module",
   "private": true,
