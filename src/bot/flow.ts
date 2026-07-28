@@ -369,14 +369,16 @@ async function loadCryptoChoices(counterpart?: string): Promise<PayAssetChoice[]
   });
   // The destination-side list expands one row PER NETWORK (ETH ×7, USDC ×16),
   // each row already carrying the full networks[] — aggregate to one choice
-  // per asset or the picker shows a wall of duplicates.
+  // per SYMBOL (wrapped variants of a coin merge too; the network picker
+  // disambiguates) or the picker shows a wall of duplicates.
   const byAsset = new Map<string, PayAssetChoice>();
   for (const a of res.items) {
     if (a.category !== "Crypto") continue;
-    let choice = byAsset.get(a.asset_id);
+    const key = a.symbol.toUpperCase();
+    let choice = byAsset.get(key);
     if (!choice) {
       choice = { assetId: a.asset_id, symbol: a.symbol, name: a.name, networks: [] };
-      byAsset.set(a.asset_id, choice);
+      byAsset.set(key, choice);
     }
     for (const n of a.networks) {
       if (!choice.networks.some((x) => x.asset_v1 === n.asset_v1)) {
