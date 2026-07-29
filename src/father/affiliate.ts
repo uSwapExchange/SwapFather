@@ -50,7 +50,7 @@ export async function registerAffiliate(params: {
   username: string;
   displayName: string;
   nearAccount: string;
-  xmrAddress?: string;
+  xmrAddress: string;
 }): Promise<AffiliateRegistration> {
   const orgId = process.env.FATHER_ORG_ID;
   if (!orgId) throw new AffiliateError("not_configured", "FATHER_ORG_ID is not set");
@@ -62,7 +62,7 @@ export async function registerAffiliate(params: {
         username: params.username,
         display_name: params.displayName,
         near_account: params.nearAccount,
-        ...(params.xmrAddress ? { xmr_address: params.xmrAddress } : {}),
+        xmr_address: params.xmrAddress,
       },
     },
   );
@@ -92,4 +92,18 @@ export function affiliateEarnings(token: string): Promise<AffiliateEarnings> {
 
 export function affiliateMe(token: string): Promise<Record<string, unknown>> {
   return req("/v1/affiliate/me", { token });
+}
+
+export function updateAffiliatePayoutAddresses(
+  token: string,
+  params: { nearAccount: string; xmrAddress: string },
+): Promise<Record<string, unknown>> {
+  return req("/v1/affiliate/payout-addresses", {
+    method: "PATCH",
+    token,
+    body: {
+      near_account: params.nearAccount,
+      xmr_address: params.xmrAddress,
+    },
+  });
 }

@@ -29,7 +29,12 @@ import { logger } from "../lib/logger.ts";
 import { setupBotProfile } from "../lib/telegram-profile.ts";
 import { rowToTenant, type Fleet } from "../fleet/manager.ts";
 import type { TenantMode } from "../tenant.ts";
-import { affiliateEarnings, AffiliateError, registerAffiliate } from "./affiliate.ts";
+import {
+  affiliateEarnings,
+  AffiliateError,
+  registerAffiliate,
+  updateAffiliatePayoutAddresses,
+} from "./affiliate.ts";
 
 interface FDraft {
   mode?: TenantMode;
@@ -176,32 +181,12 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           }
           if (f.s.draft) f.s.draft.code = code;
           f.s.awaiting = "near";
-          return show(f, {
-            text: [
-              "💰 <b>Payout account</b>",
-              "",
-              "Send the <b>NEAR account</b> that should receive your earnings (e.g. <code>yourname.near</code>).",
-              "",
-              "🆕 <b>Don't have one?</b> Takes ~2 minutes:",
-              "1. Go to near.com and tap <b>Create Account</b>",
-              "2. Sign up with email or a passphrase",
-              "3. Pick your account name — that name (like <code>yourname.near</code>) IS your payout address. Send it here.",
-              "",
-              "<i>You can also add a Monero address in the next step, and change either anytime.</i>",
-            ].join("\n"),
-            keyboard: [
-              [{ text: "🌈 Create a NEAR account", url: "https://near.com" }],
-              [btn("‹ Back", "pl")],
-            ],
-          });
+          return show(f, nearPrompt("pl"));
         }
         case "near": {
           if (f.s.draft) f.s.draft.near = text;
           f.s.awaiting = "xmr";
-          return show(f, {
-            text: "Optional: send a <b>Monero (XMR) address</b> for payouts too, or skip.",
-            keyboard: [[btn("⏭ Skip", "xs")]],
-          });
+          return show(f, xmrPrompt("ps"));
         }
         case "xmr": {
           if (f.s.draft) f.s.draft.xmr = text;
@@ -230,10 +215,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
         case "pnear": {
           f.s.payout = { ...(f.s.payout ?? {}), near: text.trim() };
           f.s.awaiting = "pxmr";
-          return show(f, {
-            text: "Optional: send a <b>Monero (XMR) address</b> for payouts too, or skip.",
-            keyboard: [[btn("⏭ Skip", `px:${f.s.manageId}`)]],
-          });
+          return show(f, xmrPrompt(`t:${f.s.manageId}`));
         }
         case "pxmr": {
           f.s.awaiting = null;
@@ -367,28 +349,12 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
             .replace(/[^a-z0-9_-]/g, "")
             .slice(0, 32);
           f.s.awaiting = "near";
-          return show(f, {
-            text: [
-              "💰 <b>Payout account</b>",
-              "",
-              "Send the <b>NEAR account</b> that should receive your earnings (e.g. <code>yourname.near</code>).",
-              "",
-              "🆕 <b>Don't have one?</b> Takes ~2 minutes:",
-              "1. Go to near.com and tap <b>Create Account</b>",
-              "2. Sign up with email or a passphrase",
-              "3. Pick your account name — that name (like <code>yourname.near</code>) IS your payout address. Send it here.",
-              "",
-              "<i>You can also add a Monero address in the next step, and change either anytime.</i>",
-            ].join("\n"),
-            keyboard: [
-              [{ text: "🌈 Create a NEAR account", url: "https://near.com" }],
-              [btn("‹ Back", "pl")],
-            ],
-          });
+          return show(f, nearPrompt("pl"));
         }
         case "xs":
-          f.s.awaiting = null;
-          return doRegister(f);
+          // Compatibility for payout screens sent before XMR became required.
+          f.s.awaiting = "xmr";
+          return show(f, xmrPrompt("ps"));
         case "pl":
           f.s.awaiting = null;
           return showConfirm(f);
@@ -421,9 +387,14 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           const id = Number(a);
           if (!ownsTenant(f, id)) return;
           f.s.manageId = id;
+          const row = getTenantRow(id)!;
+          if (row.creator_code && row.affiliate_token_enc) {
+            f.s.payout = { code: row.creator_code };
+            f.s.awaiting = "pnear";
+            return show(f, nearPrompt(`t:${id}`));
+          }
           f.s.payout = {};
           f.s.awaiting = "pcode";
-          const row = getTenantRow(id)!;
           const def = row.bot_username.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 32);
           return show(f, {
             text: [
@@ -451,8 +422,12 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           return show(f, nearPrompt(`t:${id}`));
         }
         case "px": {
-          f.s.awaiting = null;
-          return finishPayout(f, "");
+          // Compatibility for payout screens sent before XMR became required.
+          const id = Number(a);
+          if (!ownsTenant(f, id)) return;
+          f.s.manageId = id;
+          f.s.awaiting = "pxmr";
+          return show(f, xmrPrompt(`t:${id}`));
         }
         case "ew":
           if (!ownsTenant(f, Number(a))) return;
@@ -683,56 +658,83 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
   function nearPrompt(backTo: string): FScreen {
     return {
       text: [
-        "💰 <b>Payout account</b>",
+        "💰 <b>NEAR payout account</b>",
         "",
-        "Send the <b>NEAR account</b> that should receive your earnings (e.g. <code>yourname.near</code>).",
+        "Send the <b>NEAR account ID</b> that should receive your earnings.",
         "",
-        "🆕 <b>Don't have one?</b> Takes ~2 minutes:",
-        "1. Go to near.com and tap <b>Create Account</b>",
-        "2. Sign up with email or a passphrase",
-        "3. Your account name (like <code>yourname.near</code>) IS your payout address — send it here.",
+        "This may be a named account such as <code>yourname.near</code> or a longer account ID supplied by your wallet.",
+        "",
+        "🆕 <b>Need a NEAR account?</b>",
+        "Choose a wallet from NEAR's official wallet directory, create an account, then copy its NEAR account ID here.",
+        "",
+        "<i>near.com changed its onboarding and may not create a named .near account. Named .near accounts still exist.</i>",
       ].join("\n"),
       keyboard: [
-        [{ text: "🌈 Create a NEAR account", url: "https://near.com" }],
+        [{ text: "🌈 Choose a NEAR wallet", url: "https://wallet.near.org" }],
         [btn("‹ Back", backTo)],
       ],
     };
   }
 
-  /** Register (or re-register) payouts for an existing tenant. */
+  function xmrPrompt(backTo: string): FScreen {
+    return {
+      text: [
+        "💰 <b>Monero payout address</b>",
+        "",
+        "Send the <b>XMR address</b> that should receive your earnings.",
+        "",
+        "<b>Both NEAR and XMR payout destinations are required.</b> The payout engine needs both before creator fees can be attached to your sales.",
+      ].join("\n"),
+      keyboard: [[btn("‹ Back", backTo)]],
+    };
+  }
+
+  /** Register payouts or update their destinations for an existing tenant. */
   async function finishPayout(f: Fctx, xmr: string) {
     const id = f.s.manageId;
     const p = f.s.payout;
     f.s.payout = undefined;
-    if (id === undefined || !ownsTenant(f, id) || !p?.code || !p.near) {
+    if (id === undefined || !ownsTenant(f, id) || !p?.code || !p.near || !xmr) {
       return id === undefined ? show(f, home()) : showManage(f, id);
     }
     const row = getTenantRow(id)!;
     try {
-      const reg = await registerAffiliate({
-        username: p.code,
-        displayName: row.brand_name,
-        nearAccount: p.near,
-        xmrAddress: xmr || undefined,
-      });
-      updateTenant(id, {
-        creator_code: p.code,
-        affiliate_token_enc: reg.token ? encryptSecret(reg.token) : null,
-      });
+      if (row.affiliate_token_enc) {
+        const tenant = rowToTenant(row);
+        if (!tenant.affiliateToken) {
+          throw new AffiliateError("missing_token", "Affiliate access token is unavailable.");
+        }
+        await updateAffiliatePayoutAddresses(tenant.affiliateToken, {
+          nearAccount: p.near,
+          xmrAddress: xmr,
+        });
+      } else {
+        const reg = await registerAffiliate({
+          username: p.code,
+          displayName: row.brand_name,
+          nearAccount: p.near,
+          xmrAddress: xmr,
+        });
+        updateTenant(id, {
+          creator_code: p.code,
+          affiliate_token_enc: reg.token ? encryptSecret(reg.token) : null,
+        });
+      }
       await reloadTenant(id);
       return show(f, {
         text: [
           "✅ <b>Payouts are live.</b>",
           "",
           `Creator code: <code>${esc(p.code)}</code>`,
+          "NEAR and XMR payout destinations are connected.",
           "You now earn a share of every sale this bot makes, paid to your wallet automatically.",
         ].join("\n"),
         keyboard: [[btn("‹ Back to bot", `t:${id}`)]],
       });
     } catch (err) {
-      const msg = err instanceof AffiliateError ? err.message : "registration failed";
+      const msg = err instanceof AffiliateError ? err.message : "payout setup failed";
       return show(f, {
-        text: `⚠️ Payout setup failed: ${esc(msg)}\n\nTry a different creator code, or set it up later.`,
+        text: `⚠️ Payout setup failed: ${esc(msg)}\n\nCheck both payout addresses and try again.`,
         keyboard: [
           [btn("🔁 Try again", `ps2:${id}`)],
           [btn("‹ Back", `t:${id}`)],
@@ -826,7 +828,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
 
   async function doRegister(f: Fctx) {
     const d = f.s.draft!;
-    if (!d.code || !d.near) return showConfirm(f);
+    if (!d.code || !d.near || !d.xmr) return showConfirm(f);
     try {
       const reg = await registerAffiliate({
         username: d.code,
@@ -840,9 +842,9 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
     } catch (err) {
       const msg = err instanceof AffiliateError ? err.message : "registration failed";
       return show(f, {
-        text: `⚠️ Payout setup failed: ${esc(msg)}\n\nYou can try a different code, or launch now and add payouts later.`,
+        text: `⚠️ Payout setup failed: ${esc(msg)}\n\nCheck the creator code and both payout addresses, or launch now and add payouts later.`,
         keyboard: [
-          [btn("🔁 Try another code", "ps")],
+          [btn("🔁 Try again", "ps")],
           [btn("🚀 Launch without payouts", "L", "success")],
           [btn("‹ Cancel", "h", "danger")],
         ],
