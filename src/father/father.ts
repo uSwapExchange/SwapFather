@@ -933,7 +933,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       row.creator_code
         ? [btn("💰 Earnings", `$:${id}`), btn("✏️ Payout wallets", `ps2:${id}`)]
         : [btn("💰 Set up payouts — earn on every sale", `ps2:${id}`, "success")],
-      [btn("✨ Remove uSwap branding — $45/mo", `wl:${id}`, "primary")],
+      [btn("✨ Remove uSwap branding", `wl:${id}`, "primary")],
       [btn("🗑 Remove", `d:${id}`, "danger")],
       [btn("‹ Back", "m")],
     ];
