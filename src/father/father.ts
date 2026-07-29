@@ -35,6 +35,7 @@ import {
   registerAffiliate,
   updateAffiliatePayoutAddresses,
 } from "./affiliate.ts";
+import { formatEarningsUsd } from "./earnings.ts";
 
 interface FDraft {
   mode?: TenantMode;
@@ -528,25 +529,19 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           try {
             const e = await affiliateEarnings(tenant.affiliateToken!);
             const sum = (e.summary ?? e) as Record<string, unknown>;
-            const money = (v: unknown) => {
-              const n = Number(v ?? 0);
-              return Number.isFinite(n)
-                ? `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : "$0.00";
-            };
             const lines = [
               `💰 <b>Earnings — ${esc(row.brand_name)}</b>`,
               `<i>Creator code: ${esc(row.creator_code ?? "")}</i>`,
               "",
-              `Referred swaps:  <b>${Number(sum.referred_swaps ?? 0)}</b>`,
-              `Volume referred:  <b>${money(sum.referred_volume_usd)}</b>`,
+              `Referred sales:  <b>${Number(sum.referred_swaps ?? 0)}</b>`,
+              `Referred volume:  <b>${formatEarningsUsd(sum.referred_volume_usd)}</b>`,
               "",
-              `Your earnings:  <b>${money(sum.affiliate_amount_usd)}</b>`,
-              `• Paid out:  ${money(sum.dispatched_amount_usd)}`,
-              `• Pending:  ${money(sum.accrued_amount_usd)}`,
+              `Your earnings:  <b>${formatEarningsUsd(sum.affiliate_amount_usd)}</b>`,
+              `• Paid out:  ${formatEarningsUsd(sum.dispatched_amount_usd)}`,
+              `• Pending:  ${formatEarningsUsd(sum.accrued_amount_usd)}`,
             ];
             const failed = Number(sum.failed_amount_usd ?? 0);
-            if (failed > 0) lines.push(`• ⚠️ Failed payouts: ${money(failed)}`);
+            if (failed > 0) lines.push(`• ⚠️ Failed payouts: ${formatEarningsUsd(failed)}`);
             if (Number(sum.referred_swaps ?? 0) === 0) {
               lines.push(
                 "",
