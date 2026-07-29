@@ -43,7 +43,15 @@ export function packEmojiId(key: string): string | undefined {
 /** Inline emoji for HTML message text: uSwap custom emoji + unicode fallback. */
 function e(unicode: string, packKey?: string): string {
   const id = packKey ? packEmojiId(packKey) : undefined;
-  return id ? `<tg-emoji emoji-id="${id}">${unicode}</tg-emoji>` : unicode;
+  if (!id) return unicode;
+
+  // Telegram requires the text covered by a custom_emoji entity to contain an
+  // actual emoji. Plain logo glyphs such as ₿, Ξ, ◎ and ✕ are valid text but
+  // make the Bot API reject the entire message with ENTITY_TEXT_INVALID.
+  // Keep this guard here so a future fallback cannot silently disable custom
+  // emoji for an otherwise-entitled bot.
+  const placeholder = /\p{Extended_Pictographic}/u.test(unicode) ? unicode : "🪙";
+  return `<tg-emoji emoji-id="${id}">${placeholder}</tg-emoji>`;
 }
 
 /** Strip <tg-emoji> wrappers, keeping the unicode fallback content. */
@@ -164,9 +172,9 @@ export function productIconId(assetId: string): string | undefined {
 // ---------- crypto assets & networks ----------
 
 const ASSET_UNICODE: Record<string, string> = {
-  btc: "₿",
-  eth: "Ξ",
-  sol: "◎",
+  btc: "🟠",
+  eth: "💎",
+  sol: "🟣",
   usdc: "💵",
   usdt: "💵",
   xmr: "🕵️",
@@ -176,7 +184,7 @@ const ASSET_UNICODE: Record<string, string> = {
   near: "🌈",
   doge: "🐕",
   bnb: "🟡",
-  xrp: "✕",
+  xrp: "💧",
   trx: "🔺",
   ada: "🔷",
   zec: "🛡",
