@@ -481,7 +481,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
               "",
               "Remove all visible uSwap branding so your customers see only your brand.",
               "",
-              "<b>$45/month per bot</b>",
+              "<b>$20/month or $250 lifetime per bot</b>",
               "",
               `Contact @hiss and send them <code>@${esc(row.bot_username)}</code> to activate it.`,
               "",
