@@ -486,9 +486,12 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
               `Contact @hiss and send them <code>@${esc(row.bot_username)}</code> to activate it.`,
               "",
               "<i>uSwap still powers payments and fulfillment behind the scenes.</i>",
+              "",
+              'Or, <a href="https://github.com/uSwapExchange/SwapFather">host it yourself for free</a> with the open-source SwapFather.',
             ].join("\n"),
             keyboard: [
               [{ text: "💬 Contact @hiss", url: "https://t.me/hiss" }],
+              [{ text: "⌨️ Host it yourself — free", url: "https://github.com/uSwapExchange/SwapFather" }],
               [btn("‹ Back", `t:${id}`)],
             ],
           });
