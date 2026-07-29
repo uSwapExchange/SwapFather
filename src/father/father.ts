@@ -470,6 +470,29 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
             text: "💬 Send the new support @username:",
             keyboard: [[btn("‹ Back", `t:${a}`)]],
           });
+        case "wl": {
+          const id = Number(a);
+          if (!ownsTenant(f, id)) return;
+          const row = getTenantRow(id)!;
+          f.s.awaiting = null;
+          return show(f, {
+            text: [
+              `✨ <b>Fully white-label @${esc(row.bot_username)}</b>`,
+              "",
+              "Remove all visible uSwap branding so your customers see only your brand.",
+              "",
+              "<b>$45/month per bot</b>",
+              "",
+              `Contact @hiss and send them <code>@${esc(row.bot_username)}</code> to activate it.`,
+              "",
+              "<i>uSwap still powers payments and fulfillment behind the scenes.</i>",
+            ].join("\n"),
+            keyboard: [
+              [{ text: "💬 Contact @hiss", url: "https://t.me/hiss" }],
+              [btn("‹ Back", `t:${id}`)],
+            ],
+          });
+        }
         case "ec": {
           const id = Number(a);
           if (!ownsTenant(f, id)) return;
@@ -907,6 +930,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       row.creator_code
         ? [btn("💰 Earnings", `$:${id}`), btn("✏️ Payout wallets", `ps2:${id}`)]
         : [btn("💰 Set up payouts — earn on every sale", `ps2:${id}`, "success")],
+      [btn("✨ Remove uSwap branding — $45/mo", `wl:${id}`, "primary")],
       [btn("🗑 Remove", `d:${id}`, "danger")],
       [btn("‹ Back", "m")],
     ];
