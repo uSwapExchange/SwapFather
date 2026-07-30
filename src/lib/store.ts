@@ -293,10 +293,17 @@ export function listActiveOrders(): OrderRow[] {
   // Recently expired/failed/cancelled orders stay watched because a late
   // deposit, replay, or funded route replacement can attach a successor
   // intent after the local order entered a terminal state.
+  // Completed orders whose delivery notification was deferred must also stay
+  // watched: the protected vault can become available shortly after the
+  // intent completes. Limit that recovery window to one day so an upgrade
+  // does not notify historical rows created before delivered_notified existed.
   return db
     .query<OrderRow, []>(
       `SELECT * FROM orders
        WHERE status NOT IN ('completed','failed','refunded','cancelled','expired')
+          OR (status = 'completed'
+              AND delivered_notified = 0
+              AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day'))
           OR (status IN ('expired','failed','cancelled')
               AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day'))`,
     )
