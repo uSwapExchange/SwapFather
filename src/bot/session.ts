@@ -28,7 +28,7 @@ export interface NavLevel {
 }
 
 export type PageItem =
-  | { k: "l"; item: LeafItem; label: string; icon?: string }
+  | { k: "l"; item: LeafItem; label: string; icon?: string; category?: string }
   | {
       k: "d";
       segment: LevelSegment;
@@ -36,6 +36,7 @@ export type PageItem =
       onlyItem?: LeafItem;
       oos?: boolean;
       icon?: string;
+      category?: string;
     };
 
 export interface PayAssetChoice {

@@ -131,7 +131,13 @@ function toPageItems(res: LevelResponse): PageItem[] {
       const needsContext = /^\d/.test(c.name) && c.parent_group_name;
       const name = needsContext ? `${c.parent_group_name} · ${c.name}` : c.name;
       const label = c.subtitle ? `${name} · ${c.subtitle}` : name;
-      return { k: "l", item: slimLeaf(it.item), label, icon: leafPackKey(it.item.asset_v1) };
+      return {
+        k: "l",
+        item: slimLeaf(it.item),
+        label,
+        icon: leafPackKey(it.item.asset_v1),
+        category: it.category,
+      };
     }
     const n = it.node;
     // A drill with exactly one leaf child IS that product — treat it as a
@@ -148,6 +154,7 @@ function toPageItems(res: LevelResponse): PageItem[] {
       onlyItem: single ? slimLeaf(single) : undefined,
       oos: n.out_of_stock,
       icon: single ? leafPackKey(single.asset_v1) : undefined,
+      category: n.category,
     };
   });
 }

@@ -89,9 +89,47 @@ export interface BrowseContext {
   hideNav?: boolean;
 }
 
-/** Big sectioned levels open as a category chooser instead of a button wall. */
+/**
+ * Categorized levels open as a compact category chooser instead of a button
+ * wall. `layout: "sections"` is the server's explicit instruction; the other
+ * branches preserve compatibility with older catalog responses.
+ */
 export function browseUsesAisles(meta: LevelMeta, page: PageItem[]): boolean {
-  return (meta.categories?.length ?? 0) >= 2 && (Boolean(meta.pills) || page.length > 12);
+  return (
+    (meta.categories?.length ?? 0) >= 2 &&
+    (meta.layout === "sections" || Boolean(meta.pills) || page.length > 12)
+  );
+}
+
+const CATEGORY_WORDS: Record<string, string> = {
+  api: "API",
+  nft: "NFT",
+  sms: "SMS",
+  usa: "USA",
+  us: "US",
+  vpn: "VPN",
+};
+
+/** Turn server taxonomy headings such as `FOOD & DRINK` into button copy. */
+function categoryName(name: string): string {
+  if (name.trim().toLowerCase() === "other") return "More";
+  if (/[a-z]/.test(name)) return name;
+  return name
+    .toLocaleLowerCase("en-US")
+    .replace(/\b[\p{L}\p{N}]+\b/gu, (word) => CATEGORY_WORDS[word] ?? `${word[0]!.toUpperCase()}${word.slice(1)}`);
+}
+
+function itemCountForCategory(
+  meta: LevelMeta,
+  page: PageItem[],
+  id: string,
+  name: string,
+): number | undefined {
+  if (meta.paging !== "none") return undefined;
+  const keys = new Set([id, name].map((value) => value.toLocaleLowerCase("en-US")));
+  return page.filter(
+    (item) => item.category && keys.has(item.category.toLocaleLowerCase("en-US")),
+  ).length;
 }
 
 function breadcrumb(ctx: BrowseContext, tail?: string): string {
@@ -116,8 +154,12 @@ export function renderBrowse(
   // ----- aisle screen: the level's categories as the whole keyboard -----
   if (aisleMode) {
     const cats = meta.categories ?? [];
-    const total =
-      cats.reduce((n, c) => n + (c.count ?? 0), 0) || page.length;
+    const counts = cats.map(
+      (c) => c.count ?? itemCountForCategory(meta, page, c.id, c.name),
+    );
+    const total = counts.every((count) => count !== undefined)
+      ? counts.reduce<number>((sum, count) => sum + (count ?? 0), 0)
+      : page.length;
     // No title tail here — "🎁 Gift Cards › Select Brand" reads clunky when
     // the screen itself is the category chooser.
     const lines = [
@@ -127,13 +169,16 @@ export function renderBrowse(
     ];
     const catBtns = cats.map((c, i) => {
       const glyph = categoryEmojiChar(c.name);
-      const label = `${glyph ? glyph + " " : ""}${c.name}${c.count ? ` (${c.count})` : ""}`;
+      const count = counts[i];
+      const label = `${glyph ? glyph + " " : ""}${categoryName(c.name)}${count ? ` · ${count}` : ""}`;
       return btn(label, `ct:${i}`);
     });
-    const keyboard: Keyboard = [
-      ...grid(catBtns, 2),
-      [btn(t("btn.allItems", { count: total }), "ct:all")],
-    ];
+    const keyboard: Keyboard = [...grid(catBtns, 2)];
+    // Section layouts are already exhaustive: forcing a category keeps dense
+    // mobile catalogs scannable. Legacy pill taxonomies retain "All items".
+    if (meta.layout !== "sections") {
+      keyboard.push([btn(t("btn.allItems", { count: total }), "ct:all")]);
+    }
     if (meta.search === "server") keyboard.push([btn(t("btn.search"), "sr")]);
     if (!ctx.hideNav) keyboard.push(navRow(t));
     return { text: lines.join("\n"), keyboard };
@@ -141,7 +186,12 @@ export function renderBrowse(
 
   // ----- items screen -----
   const lines: string[] = [];
-  const tail = nav.category ?? nav.title ?? meta.title ?? "";
+  const selectedCategory = meta.categories?.find((c) => c.id === nav.category);
+  const tail = selectedCategory
+    ? categoryName(selectedCategory.name)
+    : nav.category
+      ? categoryName(nav.category)
+      : nav.title ?? meta.title ?? "";
   lines.push(breadcrumb(ctx, tail) || `<b>${esc(tail)}</b>`);
   if (nav.query) lines.push(t("browse.results", { query: esc(nav.query) }));
   if (page.length === 0) {

@@ -1,7 +1,102 @@
 import { describe, expect, test } from "bun:test";
 import { getTranslator } from "../i18n/index.ts";
-import type { Draft } from "./session.ts";
-import { renderQuote } from "./screens.ts";
+import type { LevelMeta } from "../uswap/types.ts";
+import type { Draft, NavLevel, PageItem } from "./session.ts";
+import { browseUsesAisles, renderBrowse, renderQuote } from "./screens.ts";
+
+const telegramMeta = {
+  path: { asset: "telegram", segments: [] },
+  title: "Select Product",
+  search: "client",
+  paging: "none",
+  layout: "sections",
+  categories: [
+    { id: "PREMIUM", name: "PREMIUM" },
+    { id: "STARS", name: "STARS" },
+    { id: "ACCOUNTS", name: "ACCOUNTS" },
+    { id: "BOOSTS", name: "BOOSTS" },
+    { id: "OTHER", name: "OTHER" },
+  ],
+} satisfies LevelMeta;
+
+const nav = {
+  asset: "telegram",
+  segments: [],
+  cursorStack: [null],
+  nextCursor: null,
+  title: "Select Product",
+} satisfies NavLevel;
+
+function catalogItem(label: string, category: string): PageItem {
+  return {
+    k: "l",
+    label,
+    category,
+    item: {
+      asset_v1: `asset_v1:telegram:${label}`,
+      symbol: label,
+      name: label,
+      decimals: 0,
+      chain: { id: label, name: label },
+    },
+  };
+}
+
+const telegramItems = [
+  catalogItem("Premium Top-up", "PREMIUM"),
+  catalogItem("Gift Link", "PREMIUM"),
+  catalogItem("Stars Top-up", "STARS"),
+  catalogItem("Stars Giveaway", "STARS"),
+  catalogItem("Numbers", "ACCOUNTS"),
+  catalogItem("Usernames", "ACCOUNTS"),
+  catalogItem("Boosts · 1 Month", "BOOSTS"),
+  catalogItem("Boosts · 3 Months", "BOOSTS"),
+  catalogItem("Boosts · 6 Months", "BOOSTS"),
+  catalogItem("Boosts · 1 Year", "BOOSTS"),
+  catalogItem("Ads Top-up", "OTHER"),
+  catalogItem("Fresh US Account", "OTHER"),
+] satisfies PageItem[];
+
+describe("catalog category drilldowns", () => {
+  test("honors a section layout even when the level has exactly 12 products", () => {
+    expect(browseUsesAisles(telegramMeta, telegramItems)).toBe(true);
+  });
+
+  test("renders a compact, humanized category menu with derived counts", () => {
+    const screen = renderBrowse(
+      getTranslator("en"),
+      telegramMeta,
+      nav,
+      telegramItems,
+      { familyName: "Telegram", familyEmojiHtml: "✈️" },
+    );
+    const labels = screen.keyboard.flat().map((button) => button.text);
+
+    expect(screen.text).toContain("12 products — pick a category:");
+    expect(labels).toEqual([
+      "🌟 Premium · 2",
+      "⭐️ Stars · 2",
+      "👤 Accounts · 2",
+      "⚡️ Boosts · 4",
+      "🎫 More · 2",
+      "‹ Back",
+      "🏠 Home",
+    ]);
+    expect(labels.some((label) => label.includes("All 12"))).toBe(false);
+  });
+
+  test("uses the humanized category in the product-list breadcrumb", () => {
+    const screen = renderBrowse(
+      getTranslator("en"),
+      telegramMeta,
+      { ...nav, category: "PREMIUM" },
+      telegramItems.slice(0, 2),
+      { familyName: "Telegram", familyEmojiHtml: "✈️" },
+    );
+
+    expect(screen.text).toStartWith("✈️ <b>Telegram</b> › <b>Premium</b>");
+  });
+});
 
 describe("quote fee disclosure", () => {
   test("shows the tenant fee neutrally when a referred quote includes one", () => {
