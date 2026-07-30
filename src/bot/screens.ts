@@ -15,6 +15,7 @@ import {
   assetEmojiHtml,
   assetIconId,
   categoryEmojiChar,
+  categoryIconId,
   leafEmoji,
   networkIconId,
   packEmojiId,
@@ -84,6 +85,7 @@ export function renderHome(
 const PAGE_SIZE = 24;
 
 export interface BrowseContext {
+  familyId?: string;
   familyName?: string;
   familyEmojiHtml?: string;
   hideNav?: boolean;
@@ -168,10 +170,11 @@ export function renderBrowse(
       t("browse.aisleHint", { count: total }),
     ];
     const catBtns = cats.map((c, i) => {
-      const glyph = categoryEmojiChar(c.name);
+      const iconId = categoryIconId(c.name, ctx.familyId);
+      const glyph = iconId ? undefined : categoryEmojiChar(c.name);
       const count = counts[i];
       const label = `${glyph ? glyph + " " : ""}${categoryName(c.name)}${count ? ` · ${count}` : ""}`;
-      return btn(label, `ct:${i}`);
+      return btn(label, `ct:${i}`, undefined, iconId);
     });
     const keyboard: Keyboard = [...grid(catBtns, 2)];
     // Section layouts are already exhaustive: forcing a category keeps dense

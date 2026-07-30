@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { getTranslator } from "../i18n/index.ts";
 import type { LevelMeta } from "../uswap/types.ts";
 import type { Draft, NavLevel, PageItem } from "./session.ts";
+import { filterPageByCategory } from "./flow.ts";
 import { browseUsesAisles, renderBrowse, renderQuote } from "./screens.ts";
 
 const telegramMeta = {
@@ -68,21 +69,32 @@ describe("catalog category drilldowns", () => {
       telegramMeta,
       nav,
       telegramItems,
-      { familyName: "Telegram", familyEmojiHtml: "✈️" },
+      { familyId: "telegram", familyName: "Telegram", familyEmojiHtml: "✈️" },
     );
     const labels = screen.keyboard.flat().map((button) => button.text);
 
     expect(screen.text).toContain("12 products — pick a category:");
     expect(labels).toEqual([
-      "🌟 Premium · 2",
-      "⭐️ Stars · 2",
-      "👤 Accounts · 2",
-      "⚡️ Boosts · 4",
+      "Premium · 2",
+      "Stars · 2",
+      "Accounts · 2",
+      "Boosts · 4",
       "🎫 More · 2",
       "‹ Back",
       "🏠 Home",
     ]);
+    expect(screen.keyboard[0]?.[0]?.icon_custom_emoji_id).toBeDefined();
+    expect(screen.keyboard[0]?.[1]?.icon_custom_emoji_id).toBeDefined();
+    expect(screen.keyboard[1]?.[0]?.icon_custom_emoji_id).toBeDefined();
+    expect(screen.keyboard[1]?.[1]?.icon_custom_emoji_id).toBeDefined();
+    expect(screen.keyboard[2]?.[0]?.icon_custom_emoji_id).toBeUndefined();
     expect(labels.some((label) => label.includes("All 12"))).toBe(false);
+  });
+
+  test("enforces a selected section when the API returns the whole level", () => {
+    const filtered = filterPageByCategory(telegramItems, telegramMeta, "ACCOUNTS");
+
+    expect(filtered.map((item) => item.label)).toEqual(["Numbers", "Usernames"]);
   });
 
   test("uses the humanized category in the product-list breadcrumb", () => {
@@ -91,7 +103,7 @@ describe("catalog category drilldowns", () => {
       telegramMeta,
       { ...nav, category: "PREMIUM" },
       telegramItems.slice(0, 2),
-      { familyName: "Telegram", familyEmojiHtml: "✈️" },
+      { familyId: "telegram", familyName: "Telegram", familyEmojiHtml: "✈️" },
     );
 
     expect(screen.text).toStartWith("✈️ <b>Telegram</b> › <b>Premium</b>");

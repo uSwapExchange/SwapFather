@@ -173,6 +173,7 @@ async function showBrowse(u: Uctx): Promise<void> {
   const nicheRoot = atNicheRoot(u) && !nav.category && !nav.showAll;
   const scr = screens.renderBrowse(u.t, u.s.meta, nav, u.s.page, {
     hideNav: nicheRoot,
+    familyId: family?.id,
     familyName: family?.name,
     familyEmojiHtml: family ? productEmoji(family.id) : undefined,
   });

@@ -153,6 +153,28 @@ export function categoryEmojiChar(name: string): string | undefined {
   return CATEGORY_UNICODE[name.toLowerCase()];
 }
 
+/**
+ * Custom-emoji button icon for catalog section buttons. Only return an icon
+ * when the pack has a semantically matching asset; the caller keeps the
+ * category's Unicode glyph as the fallback for everything else.
+ */
+export function categoryIconId(name: string, familyId?: string): string | undefined {
+  const category = name.toLowerCase();
+  let key: string | undefined;
+  if (category === "premium") key = "prod-tg-premium";
+  else if (category === "stars") key = "prod-tg-stars";
+  else if (category === "nitro") key = "prod-nitro";
+  else if (category === "boosts") {
+    key = familyId === "discord" ? "prod-dc-boost" : "prod-tg-boost";
+  } else if (
+    (category === "rentals" || category === "accounts") &&
+    (familyId === "telegram" || familyId === "discord")
+  ) {
+    key = PRODUCT_PACK_KEY[familyId];
+  }
+  return key ? packEmojiId(key) : undefined;
+}
+
 /** Plain unicode glyph (safe for button text). */
 export function productEmojiChar(assetId: string): string {
   return PRODUCT_UNICODE[assetId] ?? "🛍";

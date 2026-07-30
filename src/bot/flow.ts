@@ -160,6 +160,31 @@ function toPageItems(res: LevelResponse): PageItem[] {
 }
 
 /**
+ * Sectioned levels are fully tagged, so enforce the selected section locally.
+ * This is also a compatibility guard for Partner API versions that accept a
+ * category in the request but still return the unfiltered special-product
+ * level.
+ */
+export function filterPageByCategory(
+  page: PageItem[],
+  meta: LevelResponse["meta"],
+  category?: string,
+): PageItem[] {
+  if (!category || meta.layout !== "sections" || !page.some((item) => item.category)) {
+    return page;
+  }
+  const declared = meta.categories?.find((candidate) => candidate.id === category);
+  const keys = new Set(
+    [category, declared?.name]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => value.toLocaleLowerCase("en-US")),
+  );
+  return page.filter(
+    (item) => item.category && keys.has(item.category.toLocaleLowerCase("en-US")),
+  );
+}
+
+/**
  * Fetch a catalog level into the session, auto-descending through
  * single-child levels (e.g. the gift-card country list with one country).
  */
@@ -178,7 +203,7 @@ export async function enterLevel(
       category: current.category || undefined,
       cursor: curCursor ?? undefined,
     });
-    const page = toPageItems(res);
+    const page = filterPageByCategory(toPageItems(res), res.meta, current.category);
 
     // Auto-skip levels that contain exactly one drill (per meta hint).
     const first = page[0];
