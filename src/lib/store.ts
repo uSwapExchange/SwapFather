@@ -290,14 +290,14 @@ export function getOrder(orderId: number): OrderRow | null {
 }
 
 export function listActiveOrders(): OrderRow[] {
-  // Expired orders stay watched for 24h: a late deposit mints a replacement
-  // intent server-side (replaced_by_intent_id) and the order comes back to
-  // life — the poller must see that happen.
+  // Recently expired/failed/cancelled orders stay watched because a late
+  // deposit, replay, or funded route replacement can attach a successor
+  // intent after the local order entered a terminal state.
   return db
     .query<OrderRow, []>(
       `SELECT * FROM orders
        WHERE status NOT IN ('completed','failed','refunded','cancelled','expired')
-          OR (status = 'expired'
+          OR (status IN ('expired','failed','cancelled')
               AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day'))`,
     )
     .all();

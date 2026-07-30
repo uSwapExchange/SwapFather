@@ -28,6 +28,7 @@ import { markup } from "./keyboard.ts";
 import { copyBtn, btn } from "./keyboard.ts";
 import { esc } from "../lib/format.ts";
 import { logger } from "../lib/logger.ts";
+import { expectsDigitalDelivery, successorIntentId } from "./order-polling.ts";
 
 const POLL_INTERVAL_MS = 8_000;
 /** Telegram message effect: confetti 🎉 (private chats only). */
@@ -74,14 +75,31 @@ async function pollOnce(getApi: ApiResolver) {
 export async function checkOrderNow(api: Api, order: OrderRow): Promise<void> {
   const { intent } = await uswap.getIntent(order.intent_id);
 
-  // Late deposits replace expired intents with a market intent — follow it.
-  if (intent.status === "expired" && intent.replaced_by_intent_id) {
-    updateOrderIntent(order.id, intent.replaced_by_intent_id);
-    order.intent_id = intent.replaced_by_intent_id;
+  // Repricing/replay can replace a funded route and cancel the old intent.
+  // Always follow the server-owned replacement link regardless of the old
+  // terminal status; limiting this to `expired` strands valid paid orders.
+  const replacementIntentId = successorIntentId(intent, order.intent_id);
+  if (replacementIntentId) {
+    logger.info("order intent replaced", {
+      orderId: order.id,
+      fromIntentId: order.intent_id,
+      toIntentId: replacementIntentId,
+      oldStatus: intent.status,
+    });
+    updateOrderIntent(order.id, replacementIntentId);
+    order.intent_id = replacementIntentId;
     return checkOrderNow(api, order);
   }
 
-  if (intent.status === order.status) return;
+  if (intent.status === order.status) {
+    // Completion notification and protected-vault delivery are retryable.
+    // A transient Telegram/vault failure must not strand a paid order merely
+    // because its status no longer changes.
+    if (order.status === "completed" && !order.delivered_notified) {
+      await notifyDelivered(api, order, translatorForOrder(order));
+    }
+    return;
+  }
   const previous = order.status;
   updateOrderStatus(order.id, intent.status);
   order.status = intent.status;
@@ -154,8 +172,16 @@ async function notifyDelivered(
 ) {
   let vaultLines = "";
   const keyboard: ReturnType<typeof markup>["inline_keyboard"] = [];
+  const needsVault = expectsDigitalDelivery(order.product_label);
   try {
     const vault = await uswap.getDigitalDelivery(order.bridge_id, order.intent_id);
+    if (needsVault && vault.items.length === 0) {
+      logger.info("digital delivery not ready; notification deferred", {
+        orderId: order.id,
+        vaultStatus: vault.status,
+      });
+      return;
+    }
     for (const item of vault.items) {
       vaultLines += `\n\n<b>${esc(item.label)}</b>`;
       for (const f of item.fields ?? []) {
@@ -170,6 +196,7 @@ async function notifyDelivered(
       orderId: order.id,
       err: String(err),
     });
+    if (needsVault) return;
   }
   keyboard.push([btn(t("btn.orders"), "or")]);
 
@@ -182,13 +209,23 @@ async function notifyDelivered(
     parse_mode: "HTML" as const,
     reply_markup: { inline_keyboard: keyboard } as never,
   };
+  let sent = false;
   try {
     await api.sendMessage(order.chat_id, text, {
       ...payload,
       message_effect_id: EFFECT_CONFETTI,
     } as never);
+    sent = true;
   } catch {
-    await api.sendMessage(order.chat_id, text, payload).catch(() => {});
+    try {
+      await api.sendMessage(order.chat_id, text, payload);
+      sent = true;
+    } catch (err) {
+      logger.warn("completion notification failed", {
+        orderId: order.id,
+        err: String(err),
+      });
+    }
   }
-  markOrderDeliveredNotified(order.id);
+  if (sent) markOrderDeliveredNotified(order.id);
 }
