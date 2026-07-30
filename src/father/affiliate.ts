@@ -94,6 +94,63 @@ export function affiliateMe(token: string): Promise<Record<string, unknown>> {
   return req("/v1/affiliate/me", { token });
 }
 
+export type AffiliateFeeCategoryId =
+  | "swap"
+  | "telegram"
+  | "discord"
+  | "gift-card"
+  | "prepaid-card"
+  | "mullvad"
+  | "tf2-keys";
+
+export interface AffiliateCategoryFeeSetting {
+  category_id: AffiliateFeeCategoryId;
+  display_name: string;
+  description: string;
+  available: boolean;
+  source: "inherited" | "category_override";
+  override_fee_bps: number | null;
+  inherited_fee_bps: number;
+  effective_fee_bps: number;
+  fee_cap_bps: number;
+  platform_bps: number;
+  organization_bps: number;
+  affiliate_bps: number;
+}
+
+export interface AffiliateCategoryFees {
+  affiliate_id: string;
+  organization_id: string;
+  fee_cap_bps: number;
+  items: AffiliateCategoryFeeSetting[];
+}
+
+export function affiliateCategoryFees(token: string): Promise<AffiliateCategoryFees> {
+  return req("/v1/affiliate/category-fees", { token });
+}
+
+export function updateAffiliateCategoryFee(
+  token: string,
+  categoryId: AffiliateFeeCategoryId,
+  totalFeeBps: number,
+): Promise<AffiliateCategoryFeeSetting> {
+  return req(`/v1/affiliate/category-fees/${encodeURIComponent(categoryId)}`, {
+    method: "PUT",
+    token,
+    body: { total_fee_bps: totalFeeBps },
+  });
+}
+
+export function resetAffiliateCategoryFee(
+  token: string,
+  categoryId: AffiliateFeeCategoryId,
+): Promise<AffiliateCategoryFeeSetting> {
+  return req(`/v1/affiliate/category-fees/${encodeURIComponent(categoryId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function updateAffiliatePayoutAddresses(
   token: string,
   params: { nearAccount: string; xmrAddress: string },

@@ -30,10 +30,15 @@ import { setupBotProfile } from "../lib/telegram-profile.ts";
 import { rowToTenant, type Fleet } from "../fleet/manager.ts";
 import type { TenantMode } from "../tenant.ts";
 import {
+  affiliateCategoryFees,
   affiliateEarnings,
   AffiliateError,
   registerAffiliate,
+  resetAffiliateCategoryFee,
+  updateAffiliateCategoryFee,
   updateAffiliatePayoutAddresses,
+  type AffiliateCategoryFeeSetting,
+  type AffiliateFeeCategoryId,
 } from "./affiliate.ts";
 import { formatEarningsUsd } from "./earnings.ts";
 
@@ -70,12 +75,14 @@ interface FSession {
     | "pcode"
     | "pnear"
     | "pxmr"
+    | "categoryfee"
     | null;
   draft?: FDraft;
   manageId?: number;
   editFamilies?: string[];
   /** Payout setup bound to an existing tenant (manage screen). */
   payout?: { code?: string; near?: string };
+  feeCategory?: AffiliateFeeCategoryId;
 }
 
 interface Fctx {
@@ -221,6 +228,30 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
         case "pxmr": {
           f.s.awaiting = null;
           return finishPayout(f, text.trim());
+        }
+        case "categoryfee": {
+          const id = f.s.manageId;
+          const categoryId = f.s.feeCategory;
+          if (id === undefined || !categoryId || !ownsTenant(f, id)) return;
+          const row = getTenantRow(id);
+          const tenant = row ? rowToTenant(row) : null;
+          if (!row?.affiliate_token_enc || !tenant?.affiliateToken) {
+            f.s.awaiting = null;
+            return showManage(f, id);
+          }
+          const fees = await affiliateCategoryFees(tenant.affiliateToken);
+          const totalFeeBps = parseAffiliateFeePercent(text, fees.fee_cap_bps);
+          if (totalFeeBps === null) {
+            await ctx.reply(
+              `Enter a percentage from 0.01 to ${formatAffiliateFeeInput(fees.fee_cap_bps)} (for example, <code>10</code> or <code>12.5</code>).`,
+              { parse_mode: "HTML" },
+            );
+            return;
+          }
+          await updateAffiliateCategoryFee(tenant.affiliateToken, categoryId, totalFeeBps);
+          f.s.awaiting = null;
+          f.s.feeCategory = undefined;
+          return showCategoryFees(f, id);
         }
         case "editwelcome": {
           const id = f.s.manageId;
@@ -561,6 +592,70 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
               .answerCallbackQuery({ text: `⚠️ ${msg}`, show_alert: true })
               .catch(() => {}) as Promise<void>;
           }
+        }
+        case "fc": {
+          const id = Number(a);
+          if (!ownsTenant(f, id)) return;
+          return showCategoryFees(f, id);
+        }
+        case "fs": {
+          const id = Number(a);
+          if (!ownsTenant(f, id) || !isAffiliateFeeCategoryId(b)) return;
+          const row = getTenantRow(id)!;
+          const tenant = rowToTenant(row);
+          if (!row.affiliate_token_enc || !tenant.affiliateToken) {
+            return ctx
+              .answerCallbackQuery({
+                text: "Set up payouts before configuring customer fees.",
+                show_alert: true,
+              })
+              .catch(() => {}) as Promise<void>;
+          }
+          const fees = await affiliateCategoryFees(tenant.affiliateToken);
+          const visible = visibleAffiliateFeeItems(
+            (row.mode as TenantMode) || "shop",
+            row.families ? JSON.parse(row.families) as string[] : null,
+            fees.items,
+          );
+          const setting = visible.find((item) => item.category_id === b);
+          if (!setting) return;
+          f.s.manageId = id;
+          f.s.feeCategory = setting.category_id;
+          f.s.awaiting = "categoryfee";
+          return show(f, {
+            text: [
+              `📈 <b>${esc(setting.display_name)} customer fee</b>`,
+              "",
+              `${esc(setting.description)}`,
+              "",
+              `Current: <b>${formatAffiliateFeeBps(setting.effective_fee_bps)}</b> · ${setting.source === "category_override" ? "custom" : "inherited"}`,
+              `Your cut: ${formatAffiliateFeeBps(setting.affiliate_bps)}`,
+              `Organization: ${formatAffiliateFeeBps(setting.organization_bps)}`,
+              `Platform: ${formatAffiliateFeeBps(setting.platform_bps)}`,
+              "",
+              `Send a percentage from <b>0.01%</b> to <b>${formatAffiliateFeeBps(fees.fee_cap_bps)}</b>.`,
+              "Example: <code>10</code> or <code>12.5</code>",
+              "",
+              "<i>This fee is included in the price shown to customers.</i>",
+            ].join("\n"),
+            keyboard: [
+              ...(setting.source === "category_override"
+                ? [[btn("↩ Reset to inherited", `fr:${id}:${setting.category_id}`, "danger")]]
+                : []),
+              [btn("‹ Back", `fc:${id}`)],
+            ],
+          });
+        }
+        case "fr": {
+          const id = Number(a);
+          if (!ownsTenant(f, id) || !isAffiliateFeeCategoryId(b)) return;
+          const row = getTenantRow(id)!;
+          const tenant = rowToTenant(row);
+          if (!row.affiliate_token_enc || !tenant.affiliateToken) return;
+          await resetAffiliateCategoryFee(tenant.affiliateToken, b);
+          f.s.awaiting = null;
+          f.s.feeCategory = undefined;
+          return showCategoryFees(f, id);
         }
         case "d":
           if (!ownsTenant(f, Number(a))) return;
@@ -930,6 +1025,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       row.creator_code
         ? [btn("💰 Earnings", `$:${id}`), btn("✏️ Payout wallets", `ps2:${id}`)]
         : [btn("💰 Set up payouts — earn on every sale", `ps2:${id}`, "success")],
+      ...(row.creator_code ? [[btn("📈 Customer fees", `fc:${id}`)]] : []),
       [btn("✨ Remove uSwap branding", `wl:${id}`, "primary")],
       [btn("🗑 Remove", `d:${id}`, "danger")],
       [btn("‹ Back", "m")],
@@ -952,6 +1048,53 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
         [btn("‹ Back", `t:${id}`)],
       ],
     });
+  }
+
+  async function showCategoryFees(f: Fctx, id: number) {
+    const row = getTenantRow(id);
+    if (!row) return showMyBots(f);
+    const tenant = rowToTenant(row);
+    if (!row.affiliate_token_enc || !tenant.affiliateToken) {
+      return show(f, {
+        text: "Set up payouts first. Your affiliate access token is also what authorizes customer-fee changes.",
+        keyboard: [[btn("💰 Set up payouts", `ps2:${id}`, "success")], [btn("‹ Back", `t:${id}`)]],
+      });
+    }
+    try {
+      const fees = await affiliateCategoryFees(tenant.affiliateToken);
+      const families = row.families ? JSON.parse(row.families) as string[] : null;
+      const items = visibleAffiliateFeeItems(
+        (row.mode as TenantMode) || "shop",
+        families,
+        fees.items,
+      );
+      const overrides = items.filter((item) => item.source === "category_override").length;
+      return show(f, {
+        text: [
+          `📈 <b>Customer fees — ${esc(row.brand_name)}</b>`,
+          "",
+          "Choose a category to set the fee included in customer prices.",
+          `Maximum: <b>${formatAffiliateFeeBps(fees.fee_cap_bps)}</b>`,
+          "",
+          `<i>${overrides === 0 ? "Nothing changed yet — every category still uses its existing inherited fee." : `${overrides} custom ${overrides === 1 ? "fee" : "fees"} active.`}</i>`,
+        ].join("\n"),
+        keyboard: [
+          ...items.map((item) => [
+            btn(
+              `${item.source === "category_override" ? "✏️" : "○"} ${item.display_name} · ${formatAffiliateFeeBps(item.effective_fee_bps)}`,
+              `fs:${id}:${item.category_id}`,
+            ),
+          ]),
+          [btn("‹ Back", `t:${id}`)],
+        ],
+      });
+    } catch (err) {
+      const msg = err instanceof AffiliateError ? err.message : "fetch failed";
+      return show(f, {
+        text: `⚠️ Couldn't load customer fees: ${esc(msg)}`,
+        keyboard: [[btn("↻ Try again", `fc:${id}`)], [btn("‹ Back", `t:${id}`)]],
+      });
+    }
   }
 
   // ---------- rendering ----------
@@ -1029,4 +1172,46 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
   async function deleteMsg(ctx: Context) {
     await ctx.deleteMessage().catch(() => {});
   }
+}
+
+const AFFILIATE_FEE_CATEGORY_IDS = new Set<AffiliateFeeCategoryId>([
+  "swap",
+  "telegram",
+  "discord",
+  "gift-card",
+  "prepaid-card",
+  "mullvad",
+  "tf2-keys",
+]);
+
+function isAffiliateFeeCategoryId(value: string): value is AffiliateFeeCategoryId {
+  return AFFILIATE_FEE_CATEGORY_IDS.has(value as AffiliateFeeCategoryId);
+}
+
+export function visibleAffiliateFeeItems(
+  mode: TenantMode,
+  families: string[] | null,
+  items: AffiliateCategoryFeeSetting[],
+): AffiliateCategoryFeeSetting[] {
+  const familySet = families ? new Set(families) : null;
+  return items.filter((item) => {
+    if (!item.available) return false;
+    if (item.category_id === "swap") return mode === "swap" || mode === "both";
+    if (mode === "swap") return false;
+    return familySet === null || familySet.has(item.category_id);
+  });
+}
+
+export function parseAffiliateFeePercent(value: string, capBps: number): number | null {
+  if (!/^\d+(\.\d{1,2})?$/.test(value.trim())) return null;
+  const bps = Math.round(Number(value.trim()) * 100);
+  return Number.isInteger(bps) && bps >= 1 && bps <= capBps ? bps : null;
+}
+
+export function formatAffiliateFeeBps(bps: number): string {
+  return `${formatAffiliateFeeInput(bps)}%`;
+}
+
+function formatAffiliateFeeInput(bps: number): string {
+  return Number((bps / 100).toFixed(2)).toString();
 }

@@ -60,6 +60,11 @@ export interface QuoteTuple {
   source_amount_usd?: number;
   destination_amount_raw: string;
   destination_amount_usd?: number;
+  creator_fee?: {
+    amount_usd: string;
+    fee_bps: number;
+    fee_category?: string | null;
+  } | null;
 }
 
 export interface Draft {

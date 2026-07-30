@@ -508,6 +508,9 @@ export function renderQuote(t: Translator, draft: Draft): Screen {
     "",
     getLine,
     `${t("quote.yousend")}:  <b>${sourceHuman} ${esc(paySymbol)}</b> <i>(≈ ${usd(q.source_amount_usd)})</i> ${t("quote.via", { network: esc(draft.payChainName ?? "") })}`,
+    ...(q.creator_fee
+      ? [`Shop fee:  <b>${usd(q.creator_fee.amount_usd)}</b> <i>(${formatFeePercent(q.creator_fee.fee_bps)})</i>`]
+      : []),
     ...(destDisplay ? [`${t("quote.deliverto")}:  <code>${esc(destDisplay)}</code>`] : []),
     ...(draft.destinationMemo
       ? [`Memo:  <code>${esc(draft.destinationMemo)}</code>`]
@@ -523,6 +526,10 @@ export function renderQuote(t: Translator, draft: Draft): Screen {
     [btn(t("btn.back"), "bk"), btn(t("btn.cancel"), "cx", "danger")],
   ];
   return { text: lines.join("\n"), keyboard };
+}
+
+function formatFeePercent(bps: number): string {
+  return `${Number((bps / 100).toFixed(2))}%`;
 }
 
 // ---------- deposit / order status ----------

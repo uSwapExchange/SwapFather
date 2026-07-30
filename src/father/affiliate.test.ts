@@ -3,7 +3,13 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 process.env.USWAP_API_KEY ??= "test-api-key";
 process.env.FATHER_ORG_ID = "org-test";
 
-const { registerAffiliate, updateAffiliatePayoutAddresses } = await import("./affiliate.ts");
+const {
+  affiliateCategoryFees,
+  registerAffiliate,
+  resetAffiliateCategoryFee,
+  updateAffiliateCategoryFee,
+  updateAffiliatePayoutAddresses,
+} = await import("./affiliate.ts");
 
 describe("affiliate payout API", () => {
   const originalFetch = globalThis.fetch;
@@ -59,6 +65,26 @@ describe("affiliate payout API", () => {
     expect(JSON.parse(String(requests[0]!.init?.body))).toEqual({
       near_account: "merchant.near",
       xmr_address: "xmr-address",
+    });
+  });
+
+  test("reads, updates, and resets category fees with affiliate authorization", async () => {
+    await affiliateCategoryFees("affiliate-token");
+    await updateAffiliateCategoryFee("affiliate-token", "telegram", 1_250);
+    await resetAffiliateCategoryFee("affiliate-token", "telegram");
+
+    expect(requests.map((request) => [request.url.split("/v1")[1], request.init?.method ?? "GET"])).toEqual([
+      ["/affiliate/category-fees", "GET"],
+      ["/affiliate/category-fees/telegram", "PUT"],
+      ["/affiliate/category-fees/telegram", "DELETE"],
+    ]);
+    expect(JSON.parse(String(requests[1]!.init?.body))).toEqual({ total_fee_bps: 1_250 });
+    expect(requests[1]!.init?.headers).toEqual({
+      "Content-Type": "application/json",
+      Authorization: "Bearer affiliate-token",
+    });
+    expect(requests[2]!.init?.headers).toEqual({
+      Authorization: "Bearer affiliate-token",
     });
   });
 });

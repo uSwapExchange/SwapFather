@@ -652,6 +652,13 @@ export async function fetchQuote(s: FlowSession, tenant: Tenant): Promise<QuoteR
     source_amount_usd: q.source_amount_usd,
     destination_amount_raw: q.destination_amount_raw,
     destination_amount_usd: q.destination_amount_usd,
+    creator_fee: q.creator_fee
+      ? {
+          amount_usd: q.creator_fee.amount_usd,
+          fee_bps: q.creator_fee.fee_bps,
+          fee_category: q.creator_fee.fee_category,
+        }
+      : null,
   };
   s.screen = "quote";
   return q;

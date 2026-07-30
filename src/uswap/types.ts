@@ -174,6 +174,14 @@ export interface QuoteResponse {
   };
   legs: QuoteLeg[];
   warnings?: unknown[];
+  creator_fee?: {
+    affiliate_username: string;
+    affiliate_display_name: string;
+    amount_usd: string;
+    amount_raw: string;
+    fee_bps: number;
+    fee_category?: string | null;
+  } | null;
 }
 
 // ---------- bridges / intents ----------
