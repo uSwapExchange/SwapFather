@@ -95,7 +95,7 @@ compatibility, all three management surfaces, and end-to-end execution.
   affiliate override changes only its chosen category.
 - Reset any validation override immediately after the production check.
 
-## Step 7 — Organization-gated affiliate fee ownership
+## Step 7 — Organization-gated affiliate fee ownership — completed
 
 - Consume the Partner API's `self_service_enabled` category-fee policy.
 - Show `Customer fees` for every tenant; keep missing-token setup guidance.
