@@ -17,7 +17,11 @@ The tenant pastes a bot token from @BotFather, picks a brand name and categories
 
 - **Same repo, two entrypoints.** Tenant bots are byte-for-byte the Best B4U UX — separate repos would mean a shared package and drift. `src/main.ts` stays the single-tenant self-host path (env-configured, no fleet code involved); `src/fleet.ts` is the hosted multi-tenant path.
 - **Monetization rides the existing affiliate rails.** No new billing surface: each tenant is registered as a uSwap **affiliate** (`POST /v1/organizations/{org}/affiliate-registrations`), and every quote from their bot carries their resolved `referral_token`, so their creator-fee share accrues automatically and pays out to their NEAR/XMR address. All swaps execute under the uSwap org API key — tenants get **no API credentials** at all.
-- **Zero custody, bounded abuse surface.** Tenants configure presentation and catalog scope only. They cannot set fees, touch routing, or see other tenants. Org-side affiliate registration settings (approval mode, cap) act as the fleet's admission throttle, and every tenant has a kill switch.
+- **Zero custody, bounded abuse surface.** Tenants configure presentation,
+  catalog scope, and their affiliate category fees only when the organization
+  permits it. Server-owned category caps remain authoritative. Tenants cannot
+  touch routing or see other tenants. Org-side affiliate registration settings
+  act as the fleet's admission throttle, and every tenant has a kill switch.
 
 ## Tenancy model
 
@@ -115,7 +119,8 @@ alias of the same factory with the wizard preset to swap mode.
 
 ## Explicitly out of scope (v1)
 
-- Tenant-set markup/fees — splits are org policy, not tenant config.
+- Tenant-set affiliate category fees above organization/category caps, or any
+  tenant control over payout splits and routing.
 - Tenant-provided org API keys (that's just self-hosting; the repo already supports it).
 - Per-asset/per-pair disables below family granularity (families cover the niche-bot use case; pair-level toggles can follow if asked for).
 - Father-bot localization.

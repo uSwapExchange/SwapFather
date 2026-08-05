@@ -94,3 +94,12 @@ compatibility, all three management surfaces, and end-to-end execution.
   Butterfly quotes remain at 0.75%, and an authenticated dedicated test
   affiliate override changes only its chosen category.
 - Reset any validation override immediately after the production check.
+
+## Step 7 — Organization-gated affiliate fee ownership
+
+- Consume the Partner API's `self_service_enabled` category-fee policy.
+- Show `Customer fees` for every tenant; keep missing-token setup guidance.
+- Render organization-disabled fee configuration as read-only.
+- Parse and display each category's effective cap when editing.
+- Test always-visible navigation, disabled self-service, and lower per-category
+  caps before deploying the fleet.

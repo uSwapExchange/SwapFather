@@ -25,6 +25,8 @@ describe("SwapFather category fees", () => {
     expect(parseAffiliateFeePercent("0", 1_500)).toBeNull();
     expect(parseAffiliateFeePercent("15.01", 1_500)).toBeNull();
     expect(parseAffiliateFeePercent("10.123", 1_500)).toBeNull();
+    expect(parseAffiliateFeePercent("2", 200)).toBe(200);
+    expect(parseAffiliateFeePercent("2.01", 200)).toBeNull();
     expect(formatAffiliateFeeBps(1_250)).toBe("12.5%");
   });
 

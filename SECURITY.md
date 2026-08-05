@@ -23,7 +23,9 @@ Please **do not open a public issue** for security problems. Report privately to
 
 If you run the factory bot for other people:
 
-- Tenants configure presentation and catalog scope only. They get no API credentials and cannot change fees or routing.
+- Tenants get no organization API credentials. Their scoped affiliate token may
+  change only their own category fees while the organization permits it, and
+  the Partner API enforces every category cap. They cannot change routing.
 - Enrollment rejects bot tokens that already have a webhook set, and caps bots per owner (`MAX_BOTS_PER_OWNER`).
 - Every tenant has a kill switch (`/tenants` for admins; pause/remove for owners). `banned` is an operator-only state owners cannot undo.
 - Wizard sessions may briefly hold in-flight secrets; they are stored encrypted and pruned after 24 hours.

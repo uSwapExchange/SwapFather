@@ -32,14 +32,18 @@ the quoted output reflects the remainder.
 4. An override accepts `1` through `1500` basis points (0.01% through 15%).
    Removing an override restores inheritance. A zero-fee mode is not included
    in the first version.
-5. The existing platform-floor and organization/affiliate split continue to
+5. Affiliate-token writes are allowed only while the owning organization has
+   affiliate-owned fee configuration enabled. The policy defaults to enabled;
+   disabling it leaves fee settings readable and organization-admin writes
+   available, but makes tenant controls read-only.
+6. The existing platform-floor and organization/affiliate split continue to
    allocate the chosen total fee. Affiliates cannot modify those policies.
    With the current 20% platform floor and a 100% affiliate partner share:
    - a 10% customer fee pays 8% of notional to the affiliate and 2% to uSwap;
    - a 15% customer fee pays 12% of notional to the affiliate and 3% to uSwap.
-6. The confirmation screen discloses the fee as a shop/service fee, including
+7. The confirmation screen discloses the fee as a shop/service fee, including
    its percentage and USD amount. It does not expose uSwap branding.
-7. The feature is strictly opt-in per category. Existing affiliates, tenants,
+8. The feature is strictly opt-in per category. Existing affiliates, tenants,
    buyers, API clients, and stored split policies do not change unless the
    authenticated affiliate explicitly creates an override.
 
@@ -209,8 +213,10 @@ current controls. Category fee values remain owned by the affiliate.
 
 ## SwapFather management UX
 
-For a tenant with an affiliate self-service token, the management screen adds a
-`📈 Customer fees` button.
+Every tenant management screen includes a `📈 Customer fees` button. A tenant
+without an affiliate self-service token is directed to payout setup. A tenant
+whose organization disabled affiliate-owned configuration sees its effective
+fees and a short read-only explanation.
 
 The category-fee screen:
 
@@ -220,15 +226,15 @@ The category-fee screen:
 - explains that the percentage raises the buyer's quoted price;
 - explains the estimated affiliate share after the current allocation policy;
 - lets the owner enter a percentage with up to two decimal places;
-- rejects values below 0.01% or above 15% before calling the API;
+- rejects values below 0.01% or above that category's effective cap before
+  calling the API;
 - offers `Use default` to delete an override;
 - refreshes from the Partner API after every mutation.
 
 The API remains the source of truth. SwapFather does not add fee columns to its
 SQLite tenant table.
 
-Tenants without an affiliate token keep their current payout-setup prompt and
-cannot access fee management.
+Tenants without an affiliate token keep their current payout-setup prompt.
 
 ## Buyer quote UX
 
