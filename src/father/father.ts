@@ -249,7 +249,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           const totalFeeBps = parseAffiliateFeePercent(text, setting.fee_cap_bps);
           if (totalFeeBps === null) {
             await ctx.reply(
-              `Enter a percentage from 0.01 to ${formatAffiliateFeeInput(setting.fee_cap_bps)} (for example, <code>10</code> or <code>12.5</code>).`,
+              `Enter a percentage from 0.01 to ${formatAffiliateFeeInput(setting.fee_cap_bps)} (for example, <code>7.25</code> or <code>7.25%</code>).`,
               { parse_mode: "HTML" },
             );
             return;
@@ -1227,8 +1227,9 @@ export function visibleAffiliateFeeItems(
 }
 
 export function parseAffiliateFeePercent(value: string, capBps: number): number | null {
-  if (!/^\d+(\.\d{1,2})?$/.test(value.trim())) return null;
-  const bps = Math.round(Number(value.trim()) * 100);
+  const normalized = value.trim().replace(/(?:%|\$)$/, "").trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+  const bps = Math.round(Number(normalized) * 100);
   return Number.isInteger(bps) && bps >= 1 && bps <= capBps ? bps : null;
 }
 
