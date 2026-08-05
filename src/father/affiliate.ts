@@ -121,6 +121,7 @@ export interface AffiliateCategoryFeeSetting {
 export interface AffiliateCategoryFees {
   affiliate_id: string;
   organization_id: string;
+  self_service_enabled: boolean;
   fee_cap_bps: number;
   items: AffiliateCategoryFeeSetting[];
 }

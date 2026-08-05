@@ -240,10 +240,16 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
             return showManage(f, id);
           }
           const fees = await affiliateCategoryFees(tenant.affiliateToken);
-          const totalFeeBps = parseAffiliateFeePercent(text, fees.fee_cap_bps);
+          const setting = fees.items.find((item) => item.category_id === categoryId);
+          if (!setting || !fees.self_service_enabled) {
+            f.s.awaiting = null;
+            f.s.feeCategory = undefined;
+            return showCategoryFees(f, id);
+          }
+          const totalFeeBps = parseAffiliateFeePercent(text, setting.fee_cap_bps);
           if (totalFeeBps === null) {
             await ctx.reply(
-              `Enter a percentage from 0.01 to ${formatAffiliateFeeInput(fees.fee_cap_bps)} (for example, <code>10</code> or <code>12.5</code>).`,
+              `Enter a percentage from 0.01 to ${formatAffiliateFeeInput(setting.fee_cap_bps)} (for example, <code>10</code> or <code>12.5</code>).`,
               { parse_mode: "HTML" },
             );
             return;
@@ -619,9 +625,14 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           );
           const setting = visible.find((item) => item.category_id === b);
           if (!setting) return;
-          f.s.manageId = id;
-          f.s.feeCategory = setting.category_id;
-          f.s.awaiting = "categoryfee";
+          if (fees.self_service_enabled) {
+            f.s.manageId = id;
+            f.s.feeCategory = setting.category_id;
+            f.s.awaiting = "categoryfee";
+          } else {
+            f.s.awaiting = null;
+            f.s.feeCategory = undefined;
+          }
           return show(f, {
             text: [
               `📈 <b>${esc(setting.display_name)} customer fee</b>`,
@@ -633,13 +644,17 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
               `Organization: ${formatAffiliateFeeBps(setting.organization_bps)}`,
               `Platform: ${formatAffiliateFeeBps(setting.platform_bps)}`,
               "",
-              `Send a percentage from <b>0.01%</b> to <b>${formatAffiliateFeeBps(fees.fee_cap_bps)}</b>.`,
-              "Example: <code>10</code> or <code>12.5</code>",
+              ...(fees.self_service_enabled
+                ? [
+                    `Send a percentage from <b>0.01%</b> to <b>${formatAffiliateFeeBps(setting.fee_cap_bps)}</b>.`,
+                    "Example: <code>10</code> or <code>12.5</code>",
+                  ]
+                : ["<i>Your organization has made affiliate fee configuration read-only.</i>"]),
               "",
               "<i>This fee is included in the price shown to customers.</i>",
             ].join("\n"),
             keyboard: [
-              ...(setting.source === "category_override"
+              ...(fees.self_service_enabled && setting.source === "category_override"
                 ? [[btn("↩ Reset to inherited", `fr:${id}:${setting.category_id}`, "danger")]]
                 : []),
               [btn("‹ Back", `fc:${id}`)],
@@ -652,6 +667,13 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           const row = getTenantRow(id)!;
           const tenant = rowToTenant(row);
           if (!row.affiliate_token_enc || !tenant.affiliateToken) return;
+          const fees = await affiliateCategoryFees(tenant.affiliateToken);
+          if (!fees.self_service_enabled) {
+            return ctx.answerCallbackQuery({
+              text: "Your organization has disabled affiliate fee changes.",
+              show_alert: true,
+            }).catch(() => {}) as Promise<void>;
+          }
           await resetAffiliateCategoryFee(tenant.affiliateToken, b);
           f.s.awaiting = null;
           f.s.feeCategory = undefined;
@@ -1025,7 +1047,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
       row.creator_code
         ? [btn("💰 Earnings", `$:${id}`), btn("✏️ Payout wallets", `ps2:${id}`)]
         : [btn("💰 Set up payouts — earn on every sale", `ps2:${id}`, "success")],
-      ...(row.creator_code ? [[btn("📈 Customer fees", `fc:${id}`)]] : []),
+      [btn("📈 Customer fees", `fc:${id}`)],
       [btn("✨ Remove uSwap branding", `wl:${id}`, "primary")],
       [btn("🗑 Remove", `d:${id}`, "danger")],
       [btn("‹ Back", "m")],
@@ -1073,15 +1095,17 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
         text: [
           `📈 <b>Customer fees — ${esc(row.brand_name)}</b>`,
           "",
-          "Choose a category to set the fee included in customer prices.",
-          `Maximum: <b>${formatAffiliateFeeBps(fees.fee_cap_bps)}</b>`,
+          fees.self_service_enabled
+            ? "Choose a category to set the fee included in customer prices."
+            : "Your organization has made fee configuration read-only.",
+          `Organization maximum: <b>${formatAffiliateFeeBps(fees.fee_cap_bps)}</b> · category caps may be lower`,
           "",
           `<i>${overrides === 0 ? "Nothing changed yet — every category still uses its existing inherited fee." : `${overrides} custom ${overrides === 1 ? "fee" : "fees"} active.`}</i>`,
         ].join("\n"),
         keyboard: [
           ...items.map((item) => [
             btn(
-              `${item.source === "category_override" ? "✏️" : "○"} ${item.display_name} · ${formatAffiliateFeeBps(item.effective_fee_bps)}`,
+              `${fees.self_service_enabled ? (item.source === "category_override" ? "✏️" : "○") : "🔒"} ${item.display_name} · ${formatAffiliateFeeBps(item.effective_fee_bps)} · max ${formatAffiliateFeeBps(item.fee_cap_bps)}`,
               `fs:${id}:${item.category_id}`,
             ),
           ]),
