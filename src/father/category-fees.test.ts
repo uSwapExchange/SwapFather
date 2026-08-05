@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AffiliateCategoryFeeSetting } from "./affiliate.ts";
 import {
+  affiliateFeeExample,
   formatAffiliateFeeBps,
   parseAffiliateFeePercent,
   visibleAffiliateFeeItems,
@@ -33,6 +34,9 @@ describe("SwapFather category fees", () => {
     expect(parseAffiliateFeePercent("2", 200)).toBe(200);
     expect(parseAffiliateFeePercent("2.01", 200)).toBeNull();
     expect(formatAffiliateFeeBps(1_250)).toBe("12.5%");
+    expect(affiliateFeeExample(100)).toBe("1%");
+    expect(affiliateFeeExample(500)).toBe("5%");
+    expect(affiliateFeeExample(1_500)).toBe("7.25%");
   });
 
   test("shows only categories sold by each tenant mode", () => {
