@@ -207,6 +207,13 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           if (id !== undefined && ownsTenant(f, id)) {
             updateTenant(id, { brand_name: text.slice(0, 48) });
             await reloadTenant(id);
+            const tenant = rowToTenant(getTenantRow(id)!);
+            const api = fleet.apiFor(id);
+            if (api) {
+              await setupBotProfile(api, tenant.brandName, tenant.mode).catch((err) =>
+                logger.warn("tenant profile setup failed", { tenantId: id, err: String(err) }),
+              );
+            }
           }
           return showManage(f, id!);
         }
@@ -249,7 +256,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
           const totalFeeBps = parseAffiliateFeePercent(text, setting.fee_cap_bps);
           if (totalFeeBps === null) {
             await ctx.reply(
-              `Enter a percentage from 0.01 to ${formatAffiliateFeeInput(setting.fee_cap_bps)} (for example, <code>7.25</code> or <code>7.25%</code>).`,
+              `${esc(setting.display_name)} is capped at ${formatAffiliateFeeBps(setting.fee_cap_bps)} by your organization. Enter 0.01% to ${formatAffiliateFeeBps(setting.fee_cap_bps)} (for example, <code>${affiliateFeeExample(setting.fee_cap_bps)}</code>).`,
               { parse_mode: "HTML" },
             );
             return;
@@ -647,7 +654,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
               ...(fees.self_service_enabled
                 ? [
                     `Send a percentage from <b>0.01%</b> to <b>${formatAffiliateFeeBps(setting.fee_cap_bps)}</b>.`,
-                    "Example: <code>10</code> or <code>12.5</code>",
+                    `Example: <code>${affiliateFeeExample(setting.fee_cap_bps)}</code>`,
                   ]
                 : ["<i>Your organization has made affiliate fee configuration read-only.</i>"]),
               "",
@@ -981,7 +988,7 @@ export function registerFather(bot: Bot, fleet: Fleet, opts: FatherOptions = {})
     });
     const tenant = rowToTenant(getTenantRow(tenantId)!);
     await fleet.spawn(tenant);
-    setupBotProfile(fleet.apiFor(tenantId)!, tenant.brandName).catch((err) =>
+    setupBotProfile(fleet.apiFor(tenantId)!, tenant.brandName, tenant.mode).catch((err) =>
       logger.warn("tenant profile setup failed", { tenantId, err: String(err) }),
     );
     f.s.draft = undefined;
@@ -1235,6 +1242,10 @@ export function parseAffiliateFeePercent(value: string, capBps: number): number 
 
 export function formatAffiliateFeeBps(bps: number): string {
   return `${formatAffiliateFeeInput(bps)}%`;
+}
+
+export function affiliateFeeExample(capBps: number): string {
+  return `${formatAffiliateFeeInput(Math.min(725, capBps))}%`;
 }
 
 function formatAffiliateFeeInput(bps: number): string {
